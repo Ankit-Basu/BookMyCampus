@@ -20,7 +20,6 @@ import { Counter, CursorGlow, Reveal, SmoothScroll, Tilt } from '../components/m
 import PrismaticBurst from '../components/reactbits/bg/PrismaticBurst'
 import Backdrop, { Sparks } from '../components/Backdrop'
 import BlurText from '../components/reactbits/BlurText'
-import Magnet from '../components/reactbits/Magnet'
 import ShinyText from '../components/reactbits/ShinyText'
 import { Wordmark } from '../components/AppShell'
 import { TypeIcon } from '../components/ui'
@@ -283,7 +282,7 @@ export default function Landing() {
       mm.add('(prefers-reduced-motion: no-preference)', () => {
         gsap.from('.hero-line', { yPercent: 110, opacity: 0, stagger: 0.12, duration: 1.1, ease: 'expo.out', delay: 0.15 })
         gsap.from('.hero-pass', { y: 80, rotate: 6, opacity: 0, duration: 1.4, ease: 'expo.out', delay: 0.4 })
-        gsap.from('.hero-cta > *', { y: 20, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power3.out', delay: 0.7 })
+        gsap.from('.hero-cta > *', { y: 20, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power3.out', delay: 0.7, clearProps: 'transform,opacity' })
         // scroll-away parallax: headline drifts up, pass sinks + rotates, aurora dims
         gsap.to('.hero-copy', { yPercent: -18, opacity: 0.2, ease: 'none', scrollTrigger: { trigger: hero.current, start: 'top top', end: 'bottom top', scrub: true } })
         gsap.to('.hero-pass', { yPercent: 30, rotate: -8, ease: 'none', scrollTrigger: { trigger: hero.current, start: 'top top', end: 'bottom top', scrub: true } })
@@ -362,11 +361,9 @@ export default function Landing() {
               animateBy="words"
             />
             <div className="hero-cta row wrap" style={{ marginTop: 30, gap: 14 }}>
-              <Magnet padding={60} magnetStrength={4}>
-                <Link to={cta} className="key key-amber key-lg">
-                  Start booking <ArrowRight weight="bold" />
-                </Link>
-              </Magnet>
+              <Link to={cta} className="key key-amber key-lg">
+                Start booking <ArrowRight weight="bold" />
+              </Link>
               <a href="#how" className="key key-ghost key-lg">
                 See why it can’t double-book
               </a>

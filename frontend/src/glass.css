@@ -598,3 +598,16 @@
   pointer-events: none;
   z-index: -1;
 }
+
+/* hero CTAs: one line, same height, same baseline */
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.hero-cta > .key {
+  height: 54px;
+  margin: 0;
+  vertical-align: middle;
+}
