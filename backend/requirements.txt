@@ -1,0 +1,14 @@
+Django==5.2.7
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+django-filter==25.1
+django-cors-headers==4.9.0
+psycopg[binary]==3.2.10
+python-dateutil==2.9.0.post0
+qrcode[pil]==8.2
+ics==0.7.2
+celery==5.5.3
+redis==6.4.0
+python-dotenv==1.1.1
+Pillow==11.3.0
+TatSu==5.12.2  # ics 0.7 is incompatible with newer TatSu

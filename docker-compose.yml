@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bmc-postgres
+    environment:
+      POSTGRES_DB: bookmycampus
+      POSTGRES_USER: bmc
+      POSTGRES_PASSWORD: bmc_dev_password
+    # max_connections raised so the 500-way concurrency test can open a real connection per attempt
+    command: ["postgres", "-c", "max_connections=700"]
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bmc -d bookmycampus"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: bmc-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

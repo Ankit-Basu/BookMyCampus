@@ -1,0 +1,181 @@
+import { ArrowLeft, CalendarPlus, CheckCircle, Circle, QrCode, SignOut, Timer, XCircle } from '@phosphor-icons/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
+import { type CSSProperties } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+
+import { BookingQR, mmss, useCheckinWindow } from '../components/BookingTicket'
+import { Reveal } from '../components/motion'
+import { Skeleton, StatusTag } from '../components/ui'
+import { api, download, errorMessage } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import { durationLabel, fmtRelative, ROLE_LABEL } from '../lib/format'
+import type { Booking } from '../lib/types'
+
+function Timeline({ b }: { b: Booking }) {
+  const steps = [
+    { label: 'Requested', at: b.created_at, done: true },
+    ...b.approvals.map((a) => ({
+      label: `${a.step_name}${a.decided_by_name ? ` · ${a.decided_by_name}` : ` · ${ROLE_LABEL[a.approver_role] ?? a.approver_role}`}`,
+      at: a.decided_at,
+      done: a.status === 'approved',
+      bad: a.status === 'rejected',
+      live: a.status === 'pending',
+      note: a.comment,
+    })),
+    ...(b.checkin ? [{ label: `Checked in (${b.checkin.method.replace('_', ' ')})`, at: b.checkin.checked_in_at, done: true }] : []),
+    ...(b.checkin?.checked_out_at ? [{ label: 'Checked out', at: b.checkin.checked_out_at, done: true }] : []),
+    ...(['released', 'cancelled', 'displaced', 'rejected'].includes(b.status) ? [{ label: b.status_label, at: b.decided_at, bad: true, note: b.status_note }] : []),
+  ] as { label: string; at: string | null; done?: boolean; bad?: boolean; live?: boolean; note?: string }[]
+  return (
+    <ol className="timeline">
+      {steps.map((s, i) => (
+        <li key={i} className={s.bad ? 'bad' : s.done ? 'done' : s.live ? 'live' : ''}>
+          <span className="tl-icon">{s.bad ? <XCircle weight="fill" /> : s.done ? <CheckCircle weight="fill" /> : <Circle weight={s.live ? 'duotone' : 'regular'} />}</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{s.label}</div>
+            {s.at && <div className="mono muted" style={{ fontSize: 11 }}>{format(new Date(s.at), 'd MMM, HH:mm')} · {fmtRelative(s.at)}</div>}
+            {s.live && <div className="muted" style={{ fontSize: 12 }}>Waiting on this step…</div>}
+            {s.note && <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>“{s.note}”</div>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+export default function BookingPage() {
+  const { id } = useParams()
+  const { user } = useAuth()
+  const qc = useQueryClient()
+  const nav = useNavigate()
+  const { data: b } = useQuery({ queryKey: ['booking', id], queryFn: () => api.get<Booking>(`/bookings/${id}`).then((r) => r.data), refetchInterval: 20000 })
+
+  const act = useMutation({
+    mutationFn: ({ path, body }: { path: string; body?: object }) => api.post(`/bookings/${id}/${path}`, body ?? {}).then((r) => r.data),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['booking', id] })
+      qc.invalidateQueries({ queryKey: ['bookings'] })
+      toast.success({ cancel: 'Cancelled — slot released to others', 'check-out': 'Checked out — remaining time handed back', 'check-in': 'Checked in. Enjoy!' }[v.path] ?? 'Done')
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+
+  if (!b) return <div className="page"><Skeleton h={480} /></div>
+  return <BookingView b={b} mine={b.user === user?.id} act={act.mutate} busy={act.isPending} nav={nav} />
+}
+
+function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; act: (v: { path: string; body?: object }) => void; busy: boolean; nav: (p: string) => void }) {
+  const w = useCheckinWindow(b)
+  const active = ['pending', 'confirmed', 'checked_in'].includes(b.status)
+  const start = new Date(b.start)
+  const end = new Date(b.end)
+  const untilOpen = w.opens - w.now
+  return (
+    <div className="page">
+      <Link to="/bookings" className="chip" style={{ marginBottom: 18 }}>
+        <ArrowLeft size={14} /> My bookings
+      </Link>
+      <div className="booking-layout">
+        <Reveal>
+          <div className={`pass-big ${active ? '' : 'is-void'}`} style={{ '--c': b.resource_color } as CSSProperties}>
+            <div className="pass-photo">
+              {b.resource_cover && <img src={b.resource_cover} alt="" />}
+              <div className="rhero-shade" />
+              <div className="pass-photo-copy">
+                <div className="eyebrow">{b.resource_type} · {b.resource_code}</div>
+                <div className="display" style={{ fontSize: 'clamp(36px,4.6vw,58px)' }}>{b.resource_name}</div>
+                <div className="muted">{b.location}</div>
+              </div>
+            </div>
+            <div className="pass-perf" />
+            <div className="pass-body">
+              <div className="pass-grid">
+                <div>
+                  <div className="eyebrow">Date</div>
+                  <div className="display" style={{ fontSize: 30 }}>{format(start, 'EEE d MMM')}</div>
+                </div>
+                <div>
+                  <div className="eyebrow">Time</div>
+                  <div className="mono" style={{ fontSize: 22, color: 'var(--amber-hi)' }}>{format(start, 'HH:mm')}–{format(end, 'HH:mm')}</div>
+                  <div className="mono muted" style={{ fontSize: 11 }}>{durationLabel(b.start, b.end)}</div>
+                </div>
+                <div>
+                  <div className="eyebrow">Booked by</div>
+                  <div>{b.user_name}</div>
+                  {b.on_behalf_of && <div className="muted" style={{ fontSize: 12 }}>for {b.on_behalf_of}</div>}
+                </div>
+                <div>
+                  <div className="eyebrow">Status</div>
+                  <StatusTag status={b.status} label={b.status_label} />
+                </div>
+              </div>
+              <div className="divider" />
+              <div className="spread" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="h2">{b.title}</div>
+                  {b.purpose && <p className="muted" style={{ margin: '4px 0 0', fontSize: 13.5 }}>{b.purpose}</p>}
+                  <div className="mono muted" style={{ fontSize: 12, marginTop: 10 }}>REF {b.reference} · {b.attendees} people</div>
+                </div>
+                <BookingQR b={b} size={150} />
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        <aside className="col" style={{ gap: 18 }}>
+          {mine && b.status === 'confirmed' && b.requires_checkin && (
+            <Reveal className={`glass pad checkin-card ${w.open ? 'live' : ''}`}>
+              <div className="row" style={{ gap: 10 }}>
+                <Timer size={22} color={w.open ? 'var(--mint)' : 'var(--muted)'} weight="duotone" />
+                <div className="h2">{w.open ? 'Check-in is open' : untilOpen > 0 ? 'Check-in opens soon' : 'Check-in window'}</div>
+              </div>
+              {w.open ? (
+                <>
+                  <div className="countdown mono">{mmss(w.remaining)}</div>
+                  <p className="muted" style={{ margin: '0 0 14px', fontSize: 13 }}>until this slot auto-releases to the next person.</p>
+                  <button className="key key-mint key-lg" style={{ width: '100%' }} onClick={() => nav('/scan')}>
+                    <QrCode weight="bold" /> Scan the room QR
+                  </button>
+                </>
+              ) : (
+                <p className="muted" style={{ fontSize: 13 }}>
+                  Opens {format(new Date(w.opens), 'HH:mm')} · closes {format(new Date(w.closes), 'HH:mm')}. Scan the poster at the door within that window.
+                </p>
+              )}
+            </Reveal>
+          )}
+
+          <Reveal className="glass pad">
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Journey</div>
+            <Timeline b={b} />
+          </Reveal>
+
+          <Reveal className="glass pad col" style={{ gap: 10 }}>
+            <button className="key key-ghost" onClick={() => download(`/bookings/${b.id}/ics`, `${b.reference}.ics`)}>
+              <CalendarPlus /> Add to calendar (.ics)
+            </button>
+            {b.status === 'checked_in' && (
+              <button className="key key-amber" disabled={busy} onClick={() => act({ path: 'check-out' })}>
+                <SignOut /> Done early — check out
+              </button>
+            )}
+            {active && b.status !== 'checked_in' && (
+              <button
+                className="key key-coral"
+                disabled={busy}
+                onClick={() => {
+                  if (confirm('Cancel this booking and release the slot?')) act({ path: 'cancel' })
+                }}
+              >
+                <XCircle /> Cancel booking
+              </button>
+            )}
+            <Link to={`/resources/${b.resource}`} className="key key-ghost">View {b.resource_name}</Link>
+          </Reveal>
+        </aside>
+      </div>
+    </div>
+  )
+}

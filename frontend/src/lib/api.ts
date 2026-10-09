@@ -1,0 +1,108 @@
+import axios, { AxiosError } from 'axios'
+
+export const api = axios.create({ baseURL: '/api' })
+
+const TOKEN_KEY = 'bmc.tokens'
+
+export type Tokens = { access: string; refresh: string }
+
+export function getTokens(): Tokens | null {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY)
+    return raw ? (JSON.parse(raw) as Tokens) : null
+  } catch {
+    return null
+  }
+}
+
+export function setTokens(t: Tokens | null) {
+  try {
+    if (t) localStorage.setItem(TOKEN_KEY, JSON.stringify(t))
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* private mode — session lasts until reload */
+  }
+}
+
+api.interceptors.request.use((cfg) => {
+  const t = getTokens()
+  if (t) cfg.headers.Authorization = `Bearer ${t.access}`
+  return cfg
+})
+
+let refreshing: Promise<string | null> | null = null
+
+api.interceptors.response.use(
+  (r) => r,
+  async (error: AxiosError) => {
+    const original = error.config as (typeof error.config & { _retry?: boolean }) | undefined
+    const tokens = getTokens()
+    if (error.response?.status === 401 && tokens?.refresh && original && !original._retry) {
+      original._retry = true
+      refreshing ??= axios
+        .post('/api/auth/refresh', { refresh: tokens.refresh })
+        .then((r) => {
+          setTokens({ access: r.data.access, refresh: tokens.refresh })
+          return r.data.access as string
+        })
+        .catch(() => {
+          setTokens(null)
+          return null
+        })
+        .finally(() => {
+          refreshing = null
+        })
+      const access = await refreshing
+      if (access) {
+        original.headers = original.headers ?? {}
+        ;(original.headers as Record<string, string>).Authorization = `Bearer ${access}`
+        return api(original)
+      }
+      window.dispatchEvent(new Event('bmc:logout'))
+    }
+    return Promise.reject(error)
+  },
+)
+
+export type ApiError = { error?: string; message?: string; detail?: string; details?: Record<string, unknown> }
+
+/** Human message out of any API error shape (domain errors, DRF validation, network). */
+export function errorMessage(e: unknown): string {
+  const ax = e as AxiosError<ApiError | Record<string, string[]>>
+  const d = ax?.response?.data as ApiError & Record<string, unknown>
+  if (d) {
+    if (typeof d.message === 'string') return d.message
+    if (typeof d.detail === 'string') return d.detail
+    const first = Object.entries(d)[0]
+    if (first) {
+      const [k, v] = first
+      const msg = Array.isArray(v) ? v[0] : typeof v === 'string' ? v : JSON.stringify(v)
+      return k === 'non_field_errors' ? String(msg) : `${k}: ${msg}`
+    }
+  }
+  if (ax?.message === 'Network Error') return 'Can’t reach the server — is the backend running?'
+  return ax?.message || 'Something went wrong'
+}
+
+export function errorCode(e: unknown): string | undefined {
+  return ((e as AxiosError<ApiError>)?.response?.data as ApiError)?.error
+}
+
+export function errorDetails(e: unknown): Record<string, any> {
+  return (((e as AxiosError<ApiError>)?.response?.data as ApiError)?.details as Record<string, any>) ?? {}
+}
+
+/** Authenticated fetch of an SVG/ics endpoint → object URL (img tags can't send our bearer token). */
+export async function blobUrl(path: string): Promise<string> {
+  const r = await api.get(path, { responseType: 'blob' })
+  return URL.createObjectURL(r.data)
+}
+
+export async function download(path: string, filename: string) {
+  const url = await blobUrl(path)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
+}
