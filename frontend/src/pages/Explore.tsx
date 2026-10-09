@@ -1,8 +1,7 @@
 import { Buildings, Lightning, MagnifyingGlass, SealCheck, Stamp, UsersThree } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { addHours, startOfHour } from 'date-fns'
-import { AnimatePresence, motion } from 'motion/react'
-import { useDeferredValue, useMemo, type CSSProperties } from 'react'
+import { memo, useDeferredValue, useMemo, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { Reveal, Tilt } from '../components/motion'
@@ -10,6 +9,7 @@ import GlareHover from '../components/reactbits/GlareHover'
 import { Empty, PageHeader, Skeleton, TypeIcon } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { prefetchResource } from '../lib/preload'
 import type { Resource } from '../lib/types'
 
 type Facets = {
@@ -20,21 +20,20 @@ type Facets = {
   max_capacity: number
 }
 
-export function ResourceCard({ r, index = 0 }: { r: Resource; index?: number }) {
+/** Memoised: filtering re-renders the grid, but unchanged cards skip reconciliation entirely. */
+export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Resource; index?: number }) {
+  const qc = useQueryClient()
+  // Warm the detail page + its first calendar week while the pointer is still travelling.
+  const prefetch = () => prefetchResource(qc, r.id)
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ duration: 0.5, delay: Math.min(index, 12) * 0.035, ease: [0.22, 1, 0.36, 1] }}
-    >
+    // CSS entrance (compositor-only) instead of JS layout animation: no per-card measuring on filter.
+    <div className="rcell card-in" style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}>
       <Tilt max={5}>
-        <Link to={`/resources/${r.id}`} className="rcard" style={{ '--c': r.type_color } as CSSProperties}>
+        <Link to={`/resources/${r.id}`} className="rcard" onPointerEnter={prefetch} onFocus={prefetch} style={{ '--c': r.type_color } as CSSProperties}>
           <GlareHover glareColor="#ffffff" glareOpacity={0.18} glareAngle={-35} glareSize={260} transitionDuration={700} background="transparent" borderColor="transparent" borderRadius="20px" width="100%" height="auto">
             <div className="rcard-inner">
               <div className="rcard-img">
-                {r.cover ? <img src={r.cover.replace('w=1200', 'w=700')} alt="" loading="lazy" /> : <div className="stripes" style={{ height: '100%' }} />}
+                {r.cover ? <img src={r.cover.replace('w=1200', 'w=640')} alt="" loading="lazy" decoding="async" /> : <div className="stripes" style={{ height: '100%' }} />}
                 <span className="rcard-type">
                   <TypeIcon icon={r.type_icon} size={14} /> {r.type_name}
                 </span>
@@ -64,9 +63,9 @@ export function ResourceCard({ r, index = 0 }: { r: Resource; index?: number }) 
           </GlareHover>
         </Link>
       </Tilt>
-    </motion.div>
+    </div>
   )
-}
+})
 
 export default function Explore() {
   const { user } = useAuth()
@@ -193,13 +192,11 @@ export default function Explore() {
       {isLoading && !data ? (
         <div className="rgrid">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} h={300} />)}</div>
       ) : data?.length ? (
-        <motion.div className="rgrid" layout>
-          <AnimatePresence mode="popLayout">
-            {data.map((r, i) => (
-              <ResourceCard key={r.id} r={r} index={i} />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <div className="rgrid">
+          {data.map((r, i) => (
+            <ResourceCard key={r.id} r={r} index={i} />
+          ))}
+        </div>
       ) : (
         <Empty title="Nothing matches that.">Loosen a filter — or turn off “free this hour”.</Empty>
       )}

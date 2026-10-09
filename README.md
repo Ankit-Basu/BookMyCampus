@@ -39,7 +39,8 @@ celery -A config worker -B -l info   # production-style, uses Redis
 # 4. Frontend
 cd ../frontend
 npm install
-npm run dev                          # http://localhost:5173
+npm run dev                          # http://localhost:5173 (hot reload, slower)
+npm run demo                         # optimised production build on :5173 — use this to present
 ```
 
 ### Demo personas (password `campus123`)
@@ -86,7 +87,7 @@ The login screen has one-click buttons for each.
 | Recurring bookings with per-occurrence conflicts | `RecurringTest` (skip + all-or-nothing) |
 
 ```bash
-cd backend && python manage.py test apps.bookings     # 27 tests, includes the 500-way race
+cd backend && python manage.py test apps.bookings     # 50 tests: engine, 500-way race, full HTTP API
 ```
 
 ### API (selection)
@@ -132,6 +133,21 @@ frontend/src/
   components/        AppShell (dock), motion (GSAP/Lenis), ui, BookingTicket, reactbits/*
 docs/CONFLICT_PREVENTION.md
 ```
+
+### Performance budget (why it feels smooth)
+
+* The app backdrop (React Bits Grainient) is rendered **once** as a still frame — glass panels
+  re-blur whenever the pixels behind them change, so an animated backdrop would re-blur every
+  panel every frame. Only the landing hero animates (PrismaticBurst, 40% resolution, 30 fps,
+  paused off-screen, no blend modes).
+* The marquee is a pure CSS animation (compositor thread); hero layers are promoted with
+  `will-change`, and nothing that moves carries a filter or a blurred text-shadow.
+* Native scrolling inside the app; Lenis smooth scrolling only on the landing page's scroll scenes.
+* Persistent layout route: the dock, top bar and backdrop never remount between pages.
+* Route chunks are preloaded while the browser is idle, and hovering a resource prefetches its
+  details and its first calendar week, so pages open with data already in cache.
+* Resource cards are memoised, use CSS entrances and `content-visibility`, and skip per-card
+  backdrop blur.
 
 Campus map pins are approximate block positions on the LPU Phagwara campus. Custodians can
 correct them per location in the catalogue.

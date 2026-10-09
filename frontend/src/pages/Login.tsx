@@ -6,9 +6,8 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Wordmark } from '../components/AppShell'
-import { CursorGlow } from '../components/motion'
-import Noise from '../components/reactbits/Noise'
-import Threads from '../components/reactbits/Threads'
+import Grainient from '../components/reactbits/bg/Grainient'
+import { Sparks } from '../components/Backdrop'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ROLE_LABEL } from '../lib/format'
@@ -56,12 +55,24 @@ export default function Login() {
 
   return (
     <div className="login">
-      <div className="sky" />
-      <div className="login-threads">
-        <Threads color="#f5a524" accentColor="#8b7cff" amplitude={1.2} distance={0.3} enableMouseInteraction />
+      <div className="login-bg">
+        <Grainient
+          color1="#ff9a2e"
+          color2="#6a3dff"
+          color3="#0a0b16"
+          timeSpeed={0.18}
+          warpAmplitude={70}
+          blendSoftness={0.18}
+          grainAmount={0.06}
+          contrast={1.3}
+          zoom={0.8}
+          renderScale={0.35}
+          maxFps={24}
+        />
+        <div className="login-shade" />
+        <div className="grain" />
       </div>
-      <CursorGlow />
-      <Noise opacity={0.05} fixed zIndex={2} fps={12} />
+      <Sparks />
       <div className="login-top">
         <Wordmark />
       </div>

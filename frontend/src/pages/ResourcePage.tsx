@@ -16,7 +16,7 @@ import {
   Wrench,
 } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { addDays, format } from 'date-fns'
+import { format } from 'date-fns'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -27,6 +27,7 @@ import { Drawer, Modal, Skeleton, TypeTag } from '../components/ui'
 import { api, blobUrl, errorCode, errorDetails, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { durationLabel, inr, WEEKDAYS } from '../lib/format'
+import { initialWeek } from '../lib/preload'
 import type { Availability, Booking, ResourceDetail } from '../lib/types'
 
 type Consumable = { id: number; name: string; kind: string; unit: string; stock: number }
@@ -258,10 +259,8 @@ export default function ResourcePage() {
   const qc = useQueryClient()
   const nav = useNavigate()
   const calRef = useRef<FullCalendar>(null)
-  const [range, setRange] = useState(() => {
-    const s = new Date()
-    return { from: format(s, 'yyyy-MM-dd'), to: format(addDays(s, 7), 'yyyy-MM-dd') }
-  })
+  // Same first week FullCalendar opens on, so the hover-prefetch from Explore is a cache hit.
+  const [range, setRange] = useState(initialWeek)
   const [slot, setSlot] = useState<{ start: Date; end: Date } | null>(null)
   const [img, setImg] = useState(0)
   const [report, setReport] = useState(false)

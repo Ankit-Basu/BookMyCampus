@@ -1,6 +1,7 @@
 import 'leaflet/dist/leaflet.css'
 import './index.css'
 import './app.css'
+import './glass.css'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'

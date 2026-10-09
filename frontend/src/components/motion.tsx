@@ -9,14 +9,28 @@ gsap.registerPlugin(ScrollTrigger, useGSAP)
 
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-/** Lenis inertial scrolling, driven by GSAP's ticker so ScrollTrigger scenes stay in lock-step. */
+/** Reset scroll on navigation and let ScrollTrigger re-measure the new page. */
+export function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    const id = setTimeout(() => ScrollTrigger.refresh(), 200)
+    return () => clearTimeout(id)
+  }, [pathname])
+  return null
+}
+
+/**
+ * Lenis inertial scrolling for the landing page only (its pinned GSAP scenes benefit from it),
+ * driven by GSAP's ticker so ScrollTrigger stays in lock-step. App pages keep native scrolling.
+ */
 export function SmoothScroll() {
   const { pathname } = useLocation()
   const lenisRef = useRef<Lenis | null>(null)
 
   useEffect(() => {
-    if (reduced()) return
-    const lenis = new Lenis({ lerp: 0.11, wheelMultiplier: 1, smoothWheel: true })
+    if (reduced() || window.matchMedia('(pointer: coarse)').matches) return
+    const lenis = new Lenis({ lerp: 0.16, wheelMultiplier: 1, smoothWheel: true })
     lenisRef.current = lenis
     lenis.on('scroll', ScrollTrigger.update)
     const tick = (t: number) => lenis.raf(t * 1000)
@@ -71,12 +85,11 @@ export function Reveal({ children, className, style, stagger = 0.08, y = 28 }: {
       gsap.from(targets, {
         y,
         opacity: 0,
-        filter: 'blur(6px)',
         duration: 0.9,
         ease: 'power3.out',
         stagger,
         scrollTrigger: { trigger: ref.current, start: 'top 88%', once: true },
-        clearProps: 'filter,transform',
+        clearProps: 'transform',
       })
     },
     { scope: ref },

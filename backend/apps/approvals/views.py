@@ -14,7 +14,7 @@ class StepSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApprovalStep
         fields = ["id", "order", "name", "approver_role", "sla_hours"]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "order"]  # assigned from list position on save
 
 
 class WorkflowSerializer(serializers.ModelSerializer):

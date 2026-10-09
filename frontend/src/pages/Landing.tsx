@@ -13,15 +13,14 @@ import {
 import { useGSAP } from '@gsap/react'
 import { useQuery } from '@tanstack/react-query'
 import gsap from 'gsap'
-import { useRef, type CSSProperties } from 'react'
+import { useMemo, useRef, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Counter, CursorGlow, Reveal, Tilt } from '../components/motion'
-import Aurora from '../components/reactbits/Aurora'
+import { Counter, CursorGlow, Reveal, SmoothScroll, Tilt } from '../components/motion'
+import PrismaticBurst from '../components/reactbits/bg/PrismaticBurst'
+import Backdrop, { Sparks } from '../components/Backdrop'
 import BlurText from '../components/reactbits/BlurText'
 import Magnet from '../components/reactbits/Magnet'
-import Noise from '../components/reactbits/Noise'
-import { ScrollVelocity } from '../components/reactbits/ScrollVelocity'
 import ShinyText from '../components/reactbits/ShinyText'
 import SpotlightCard from '../components/reactbits/SpotlightCard'
 import { Wordmark } from '../components/AppShell'
@@ -255,6 +254,12 @@ export default function Landing() {
   const { user } = useAuth()
   const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<Stats>('/public/stats').then((r) => r.data) })
   const hero = useRef<HTMLDivElement>(null)
+  // Shader offsets are in drawing-buffer pixels: centre the burst behind the pass on the right.
+  const burstOffset = useMemo(() => {
+    if (typeof window === 'undefined' || window.innerWidth < 860) return { x: 0, y: 0 }
+    const scale = Math.min(window.devicePixelRatio || 1, 2) * 0.4
+    return { x: window.innerWidth * 0.22 * scale, y: window.innerHeight * 0.02 * scale }
+  }, [])
 
   useGSAP(
     () => {
@@ -289,9 +294,10 @@ export default function Landing() {
   const cta = user ? '/explore' : '/login'
   return (
     <div className="landing">
-      <div className="sky" />
+      <SmoothScroll />
+      <Backdrop />
       <CursorGlow />
-      <Noise opacity={0.05} fixed zIndex={40} fps={12} />
+      <Sparks />
 
       <nav className="landing-nav">
         <Wordmark />
@@ -304,7 +310,18 @@ export default function Landing() {
 
       <section className="hero" ref={hero}>
         <div className="hero-aurora">
-          <Aurora colorStops={['#7a3cff', '#f5a524', '#ff6f59']} amplitude={1.1} blend={0.6} speed={0.6} />
+          <PrismaticBurst
+            colors={['#ff6f59', '#f5a524', '#ffd27a', '#8b7cff', '#3ee6c1']}
+            animationType="rotate3d"
+            intensity={2.2}
+            speed={0.35}
+            distort={0.25}
+            rayCount={16}
+            offset={burstOffset}
+            mixBlendMode="none"
+            renderScale={0.4}
+            maxFps={30}
+          />
         </div>
         <div className="hero-grid">
           <div className="hero-copy">
@@ -342,13 +359,19 @@ export default function Landing() {
       </section>
 
       <section className="marquee">
-        <ScrollVelocity
-          texts={[
-            (data?.names ?? ['AI & Deep Learning Lab', 'Confocal Microscope', 'Football Turf', 'CSE Seminar Hall', '52-Seater Coach']).join('  ✦  ') + '  ✦  ',
-          ]}
-          velocity={40}
-          className="marquee-text"
-        />
+        {/* Pure-CSS marquee: runs on the compositor thread, so it never stutters when JS is busy. */}
+        <div className="marquee-track" aria-hidden>
+          {[0, 1].map((copy) => (
+            <span key={copy} className="marquee-text">
+              {(data?.names ?? ['AI & Deep Learning Lab', 'Confocal Microscope', 'Football Turf', 'CSE Seminar Hall', '52-Seater Coach']).map((n) => (
+                <span key={n}>
+                  {n}
+                  <i>✦</i>
+                </span>
+              ))}
+            </span>
+          ))}
+        </div>
       </section>
 
       <Reveal className="page stats-strip" style={{ paddingTop: 70, paddingBottom: 40 }}>

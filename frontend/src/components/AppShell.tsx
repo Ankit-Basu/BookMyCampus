@@ -11,17 +11,16 @@ import {
 } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { warmRoutes } from '../lib/preload'
 import { fmtRelative } from '../lib/format'
 import type { Notification } from '../lib/types'
-import { CursorGlow } from './motion'
-import ClickSpark from './reactbits/ClickSpark'
+import Backdrop, { Sparks } from './Backdrop'
 import Dock, { type DockItemData } from './reactbits/Dock'
-import Noise from './reactbits/Noise'
 
 export function Wordmark({ small }: { small?: boolean }) {
   return (
@@ -104,7 +103,8 @@ function Notifications() {
   )
 }
 
-export default function AppShell({ children }: { children: ReactNode }) {
+/** Persistent layout: backdrop, top bar and dock stay mounted while pages swap underneath. */
+export default function AppShell() {
   const { user, logout } = useAuth()
   const nav = useNavigate()
   const { pathname } = useLocation()
@@ -114,6 +114,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
     enabled: !!user?.is_manager,
     refetchInterval: 45000,
   })
+
+  useEffect(() => {
+    if (user) warmRoutes(user.is_manager)
+  }, [user])
 
   const at = (p: string) => pathname === p || pathname.startsWith(p + '/')
   const items: DockItemData[] = [
@@ -137,10 +141,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   items.push({ icon: <UserCircle weight="duotone" color="#c9c4d6" />, label: 'Profile', onClick: () => nav('/me'), active: at('/me') })
 
   return (
-    <ClickSpark sparkColor="#ffd27a" sparkSize={9} sparkRadius={18} sparkCount={8} duration={420}>
-      <div className="sky" />
-      <CursorGlow />
-      <Noise opacity={0.05} fixed zIndex={2} fps={12} />
+    <>
+      <Backdrop />
+      <Sparks />
       <header className="topbar glass">
         <Wordmark />
         <div className="grow" />
@@ -163,7 +166,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </>
         )}
       </header>
-      <main style={{ position: 'relative', zIndex: 3 }}>{children}</main>
+      <motion.main
+        key={pathname.split('/').slice(0, 3).join('/')}
+        className="route"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Outlet />
+      </motion.main>
       {user && (
         <div className="dock-host">
           <Dock
@@ -177,6 +188,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
           />
         </div>
       )}
-    </ClickSpark>
+    </>
   )
 }
