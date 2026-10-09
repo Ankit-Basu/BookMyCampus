@@ -22,7 +22,6 @@ import Backdrop, { Sparks } from '../components/Backdrop'
 import BlurText from '../components/reactbits/BlurText'
 import Magnet from '../components/reactbits/Magnet'
 import ShinyText from '../components/reactbits/ShinyText'
-import SpotlightCard from '../components/reactbits/SpotlightCard'
 import { Wordmark } from '../components/AppShell'
 import { TypeIcon } from '../components/ui'
 import { api } from '../lib/api'
@@ -105,6 +104,29 @@ function FakeQR() {
     <svg viewBox="0 0 21 21" shapeRendering="crispEdges">
       {cells.map((on, i) => (on ? <rect key={i} x={i % 21} y={Math.floor(i / 21)} width="1" height="1" fill="#0b0c18" /> : null))}
     </svg>
+  )
+}
+
+/** Tinted glass feature card: colour wash, glowing rim, keycap icon, pointer spotlight (CSS vars only). */
+function FeatureCard({ icon: Icon, color, title, body, index }: (typeof FEATURES)[number] & { index: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const move = (e: { clientX: number; clientY: number }) => {
+    const r = ref.current!.getBoundingClientRect()
+    ref.current!.style.setProperty('--px', `${e.clientX - r.left}px`)
+    ref.current!.style.setProperty('--py', `${e.clientY - r.top}px`)
+  }
+  return (
+    <div ref={ref} className="fcard" style={{ '--c': color } as CSSProperties} onPointerMove={move}>
+      <span className="fcard-num" aria-hidden>
+        {String(index + 1).padStart(2, '0')}
+      </span>
+      <div className="fcard-icon">
+        <Icon size={26} weight="duotone" />
+      </div>
+      <h3 className="fcard-title">{title}</h3>
+      <p className="fcard-body">{body}</p>
+      <span className="fcard-line" aria-hidden />
+    </div>
   )
 }
 
@@ -408,15 +430,9 @@ export default function Landing() {
           </h2>
         </Reveal>
         <Reveal className="feature-grid" stagger={0.1}>
-          {FEATURES.map((f) => (
+          {FEATURES.map((f, i) => (
             <div data-reveal key={f.title}>
-              <SpotlightCard className="feature-card" spotlightColor={f.color} intensity={0.55} spotlightSize={340} theme="dark">
-                <div className="feature-icon" style={{ '--c': f.color } as CSSProperties}>
-                  <f.icon size={24} weight="duotone" />
-                </div>
-                <h3 className="h2" style={{ margin: '18px 0 8px' }}>{f.title}</h3>
-                <p className="muted" style={{ margin: 0 }}>{f.body}</p>
-              </SpotlightCard>
+              <FeatureCard {...f} index={i} />
             </div>
           ))}
         </Reveal>
