@@ -22,6 +22,8 @@ export type PrismaticBurstProps = {
   /** Fraction of device pixels to render — soft rays look the same at ~0.6. */
   renderScale?: number;
   maxFps?: number;
+  /** Draw one still frame at this time (s) and stop — animate the canvas with CSS instead. */
+  stillAt?: number;
 };
 
 const vertexShader = `#version 300 es
@@ -244,6 +246,7 @@ const PrismaticBurst = ({
   paused = false,
   renderScale = 1,
   maxFps = 60,
+  stillAt,
   offset = { x: 0, y: 0 },
   hoverDampness = 0,
   rayCount,
@@ -328,11 +331,14 @@ const PrismaticBurst = ({
     triRef.current = triangle;
     meshRef.current = mesh;
 
+    // re-draws a still frame after a resize; assigned once the render loop exists
+    let kick: () => void = () => {};
     const resize = () => {
       const w = container.clientWidth || 1;
       const h = container.clientHeight || 1;
       renderer.setSize(w, h);
       program.uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+      kick();
     };
 
     let ro: ResizeObserver | null = null;
@@ -367,7 +373,8 @@ const PrismaticBurst = ({
 
     let raf = 0;
     let last = performance.now();
-    let accumTime = 0;
+    let accumTime = stillAt ?? 0;
+    let framesLeft = 3;
 
     const frameMs = 1000 / maxFps;
     const update = (now: number) => {
@@ -378,8 +385,8 @@ const PrismaticBurst = ({
       const dt = Math.max(0, now - last) * 0.001;
       last = now;
       const visible = isVisibleRef.current && !document.hidden;
-      if (!pausedRef.current) accumTime += dt;
-      if (!visible) {
+      if (!pausedRef.current && stillAt === undefined) accumTime += dt;
+      if (!visible && stillAt === undefined) {
         raf = requestAnimationFrame(update);
         return;
       }
@@ -392,7 +399,16 @@ const PrismaticBurst = ({
       program.uniforms.uMouse.value = sm as any;
       program.uniforms.uTime.value = accumTime;
       renderer.render({ scene: meshRef.current! });
+      if (stillAt !== undefined && --framesLeft <= 0) {
+        raf = 0;
+        return;
+      }
       raf = requestAnimationFrame(update);
+    };
+    kick = () => {
+      if (stillAt === undefined) return;
+      framesLeft = 2;
+      if (raf === 0) raf = requestAnimationFrame(update);
     };
     raf = requestAnimationFrame(update);
 

@@ -332,3 +332,53 @@
     transform: translate3d(-50%, 0, 0);
   }
 }
+
+/* ---- hero burst: one still frame, rotated on the compositor */
+.hero-aurora {
+  overflow: hidden;
+}
+.burst-spin {
+  position: absolute;
+  width: 115vmax;
+  height: 115vmax;
+  left: calc(74% - 57.5vmax);
+  top: calc(50% - 57.5vmax);
+  border-radius: 50%;
+  /* soft circular edge: rotates with the bitmap, so the compositor never re-masks */
+  -webkit-mask-image: radial-gradient(circle, #000 38%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 38%, transparent 70%);
+  animation: burst-spin 140s linear infinite;
+  will-change: transform;
+}
+.burst-spin > * {
+  width: 100%;
+  height: 100%;
+}
+@keyframes burst-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 860px) {
+  .burst-spin {
+    left: calc(50% - 57.5vmax);
+    top: calc(30% - 57.5vmax);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .burst-spin {
+    animation: none;
+  }
+}
+/* the nav sits over the spinning burst: keep its blur cheap */
+.landing-nav {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(9, 11, 22, 0.55);
+}
+
+.hero-aurora::after {
+  background:
+    radial-gradient(90% 80% at 70% 45%, transparent 45%, rgba(5, 6, 12, 0.6) 85%),
+    linear-gradient(180deg, transparent 72%, var(--ink-0));
+}

@@ -13,7 +13,7 @@ import {
 import { useGSAP } from '@gsap/react'
 import { useQuery } from '@tanstack/react-query'
 import gsap from 'gsap'
-import { useMemo, useRef, type CSSProperties } from 'react'
+import { useRef, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Counter, CursorGlow, Reveal, SmoothScroll, Tilt } from '../components/motion'
@@ -254,12 +254,6 @@ export default function Landing() {
   const { user } = useAuth()
   const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<Stats>('/public/stats').then((r) => r.data) })
   const hero = useRef<HTMLDivElement>(null)
-  // Shader offsets are in drawing-buffer pixels: centre the burst behind the pass on the right.
-  const burstOffset = useMemo(() => {
-    if (typeof window === 'undefined' || window.innerWidth < 860) return { x: 0, y: 0 }
-    const scale = Math.min(window.devicePixelRatio || 1, 2) * 0.4
-    return { x: window.innerWidth * 0.22 * scale, y: window.innerHeight * 0.02 * scale }
-  }, [])
 
   useGSAP(
     () => {
@@ -309,19 +303,24 @@ export default function Landing() {
       </nav>
 
       <section className="hero" ref={hero}>
+        {/*
+          The burst is drawn ONCE (stillAt) on an oversized square and then spun by a CSS animation.
+          A live ray-marching shader at full screen is what made the hero stutter on laptops; a
+          rotating bitmap runs entirely on the compositor and costs ~nothing per frame.
+        */}
         <div className="hero-aurora">
-          <PrismaticBurst
-            colors={['#ff6f59', '#f5a524', '#ffd27a', '#8b7cff', '#3ee6c1']}
-            animationType="rotate3d"
-            intensity={2.2}
-            speed={0.35}
-            distort={0.25}
-            rayCount={16}
-            offset={burstOffset}
-            mixBlendMode="none"
-            renderScale={0.4}
-            maxFps={30}
-          />
+          <div className="burst-spin">
+            <PrismaticBurst
+              colors={['#ff6f59', '#f5a524', '#ffd27a', '#8b7cff', '#3ee6c1']}
+              animationType="rotate"
+              intensity={3.2}
+              distort={0}
+              rayCount={16}
+              mixBlendMode="none"
+              renderScale={0.5}
+              stillAt={4}
+            />
+          </div>
         </div>
         <div className="hero-grid">
           <div className="hero-copy">
