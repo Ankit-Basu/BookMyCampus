@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 backend/.venv/
 backend/.env
+/.venv/
+/apps
 backend/media/
 backend/staticfiles/
 
@@ -17,3 +19,4 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+pyrightconfig.json

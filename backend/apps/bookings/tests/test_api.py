@@ -248,4 +248,4 @@ class ApiTest(APITestCase):
         self.assertEqual(self.client.get("/api/notifications").data["unread"], 0)
 
     def test_scheduler_command_runs(self):
-        call_command("run_scheduler", "--once")
+        call_command("run_scheduler", once=True)
