@@ -311,14 +311,43 @@ export default function ResourcePage() {
   }
 
   const showQr = async () => setQr(await blobUrl(`/resources/${id}/qr`))
+  const [maintOpen, setMaintOpen] = useState(false)
+
+  type Window = { id: number; kind: string; title: string; start: string; end: string; status: string; reported_by_name: string | null }
+  const { data: windows } = useQuery({
+    queryKey: ['maintenance', 'resource', id],
+    queryFn: () => api.get<Window[]>('/maintenance', { params: { resource: id, status: 'planned,in_progress' } }).then((x) => x.data),
+  })
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ['resource', id] })
+    qc.invalidateQueries({ queryKey: ['availability', Number(id)] })
+    qc.invalidateQueries({ queryKey: ['maintenance', 'resource', id] })
+  }
+  const resolveMut = useMutation({
+    mutationFn: (wid: number) => api.post(`/maintenance/${wid}/resolve`),
+    onSuccess: () => {
+      toast.success('Marked repaired — the slot is open for booking again.')
+      refreshAll()
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  const scheduleMut = useMutation({
+    mutationFn: (b: { title: string; start: string; end: string; notes: string }) => api.post('/maintenance', { resource: id, ...b }),
+    onSuccess: (res) => {
+      const n = res.data.displaced_bookings
+      toast.success(`Maintenance scheduled${n ? ` — ${n} booking${n > 1 ? 's' : ''} moved off and notified` : ''}`)
+      setMaintOpen(false)
+      refreshAll()
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
 
   const reportMut = useMutation({
     mutationFn: (body: { title: string; notes: string }) => api.post('/maintenance/report', { resource: id, ...body, hours: 24 }),
     onSuccess: () => {
       toast.success('Reported — custodians notified and the resource is blocked for repair.')
       setReport(false)
-      qc.invalidateQueries({ queryKey: ['resource', id] })
-      qc.invalidateQueries({ queryKey: ['availability', Number(id)] })
+      refreshAll()
     },
     onError: (e) => toast.error(errorMessage(e)),
   })
@@ -356,6 +385,21 @@ export default function ResourcePage() {
                 <DecryptedText text={r.code} animateOn="view" speed={40} maxIterations={14} />
               </span>
             </div>
+            <div className="rhero-actions">
+              <button className="key key-coral key-sm" onClick={() => setReport(true)}>
+                <Warning size={15} weight="bold" /> Report breakdown
+              </button>
+              {isCustodian && (
+                <>
+                  <button className="key key-ghost key-sm" onClick={() => setMaintOpen(true)}>
+                    <Wrench size={15} /> Schedule maintenance
+                  </button>
+                  <button className="key key-ghost key-sm" onClick={showQr}>
+                    <Printer size={15} /> Check-in poster
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           {gallery.length > 1 && (
             <div className="rhero-thumbs">
@@ -368,6 +412,30 @@ export default function ResourcePage() {
           )}
         </div>
       </section>
+
+      {!!windows?.length && (
+        <div className="maint-banner glass">
+          <Wrench size={22} weight="duotone" color="var(--coral)" />
+          <div className="grow" style={{ minWidth: 0 }}>
+            {windows.map((w) => (
+              <div key={w.id} className="spread" style={{ gap: 10, flexWrap: 'wrap', padding: '4px 0' }}>
+                <div>
+                  <strong>{w.kind === 'breakdown' ? 'Out of service' : 'Maintenance'}: {w.title}</strong>
+                  <div className="mono muted" style={{ fontSize: 12 }}>
+                    {format(new Date(w.start), 'EEE d MMM HH:mm')} → {format(new Date(w.end), 'EEE d MMM HH:mm')}
+                    {w.reported_by_name ? ` · reported by ${w.reported_by_name}` : ''}
+                  </div>
+                </div>
+                {isCustodian && (
+                  <button className="key key-mint key-sm" disabled={resolveMut.isPending} onClick={() => resolveMut.mutate(w.id)}>
+                    Mark repaired
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rlayout">
         <Reveal className="glass pad cal-card">
@@ -495,6 +563,34 @@ export default function ResourcePage() {
       </div>
 
       <BookingDrawer resource={r} slot={slot} onClose={() => setSlot(null)} />
+
+      <Modal open={maintOpen} onClose={() => setMaintOpen(false)} width={500}>
+        <form
+          className="col"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const f = new FormData(e.currentTarget)
+            scheduleMut.mutate({
+              title: String(f.get('title')),
+              notes: String(f.get('notes')),
+              start: new Date(String(f.get('start'))).toISOString(),
+              end: new Date(String(f.get('end'))).toISOString(),
+            })
+          }}
+        >
+          <div className="h2">Schedule maintenance</div>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            The window is written into the booking ledger. Anyone already booked inside it is moved off and notified.
+          </p>
+          <input name="title" className="input" placeholder="e.g. Annual calibration" required />
+          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label className="field"><span>From</span><input name="start" type="datetime-local" className="input" required /></label>
+            <label className="field"><span>Until</span><input name="end" type="datetime-local" className="input" required /></label>
+          </div>
+          <textarea name="notes" className="input" placeholder="Notes for the team (optional)" />
+          <button className="key key-amber" disabled={scheduleMut.isPending}><Wrench /> Block the calendar</button>
+        </form>
+      </Modal>
 
       <Modal open={report} onClose={() => setReport(false)}>
         <form

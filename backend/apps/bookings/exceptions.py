@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.db.models import ProtectedError
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -45,4 +46,10 @@ class RuleViolation(BookingError):
 def exception_handler(exc, context):
     if isinstance(exc, BookingError):
         return Response({"error": exc.code, "message": exc.message, "details": exc.details}, status=exc.http_status)
+    if isinstance(exc, ProtectedError):
+        n = len(exc.protected_objects)
+        return Response(
+            {"error": "in_use", "message": f"Still used by {n} record{'s' if n != 1 else ''} — reassign or retire them first."},
+            status=status.HTTP_409_CONFLICT,
+        )
     return drf_exception_handler(exc, context)

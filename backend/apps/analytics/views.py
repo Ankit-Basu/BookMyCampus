@@ -116,3 +116,40 @@ def public_stats(request):
     }
     cache.set("public_stats", data, 300)
     return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsManager])
+def system_health(request):
+    """What's running: database, sweeper heartbeat, Redis, email transport, realtime, timetable."""
+    from django.conf import settings
+    from django.db import connection
+
+    from apps.rules.models import Policy
+    from apps.timetable.models import TimetableVersion
+
+    db_ok = True
+    try:
+        with connection.cursor() as c:
+            c.execute("SELECT 1")
+    except Exception:
+        db_ok = False
+    redis_ok = False
+    try:
+        import redis
+
+        redis_ok = bool(redis.Redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=0.3).ping())
+    except Exception:
+        pass
+    last = Policy.get().last_sweep_at
+    age = (timezone.now() - last).total_seconds() if last else None
+    tt = TimetableVersion.objects.filter(is_current=True).first()
+    backend = settings.EMAIL_BACKEND.rsplit(".", 2)[-2]
+    return Response({
+        "database": db_ok,
+        "redis": redis_ok,
+        "sweeper": {"last_run": last, "age_seconds": age, "healthy": age is not None and age < 180},
+        "email": {"backend": backend, "live": backend == "smtp"},
+        "realtime": "sse",
+        "timetable": tt and {"label": tt.label, "published_at": tt.published_at},
+    })

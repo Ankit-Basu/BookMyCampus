@@ -32,8 +32,10 @@ python manage.py migrate
 python manage.py seed_demo --reset   # realistic LPU campus + 4 weeks of history (~1 min)
 python manage.py runserver 127.0.0.1:8000
 
-# 3. Background sweeps (auto-release, reminders) — pick one
-python manage.py run_scheduler       # simple loop, good for local dev / Windows
+# 3. Background sweeps (auto-release, reminders, completion)
+#    In dev nothing extra is needed: `runserver` starts the sweeper in-process (AUTO_SWEEP=true).
+#    The control room's health strip shows when it last ran. Alternatives:
+python manage.py run_scheduler       # standalone loop
 celery -A config worker -B -l info   # production-style, uses Redis
 
 # 4. Frontend
@@ -71,7 +73,9 @@ The login screen has one-click buttons for each.
 | **M7 Maintenance** | `apps/maintenance` | Scheduled windows + one-tap breakdown reports; displaces affected bookings and notifies them; downtime tracking |
 | **M8 Consumables** | `apps/consumables` | Stock with oversell-proof atomic decrement, issue with booking, returns, low-stock alerts |
 | **M9 Analytics** | `apps/analytics` | Utilisation by resource/type/department/day, idle-value ranking, weekday×hour heatmap, no-show rates, demand vs supply, approval turnaround, downtime, quota consumption, nightly snapshots |
-| Notifications | `apps/notifications` | In-app bell + email for every lifecycle event |
+| Notifications | `apps/notifications` | Pushed live over **Server-Sent Events** (toast + bell the instant it happens) and emailed; SMTP via env vars |
+| People & master data | `apps/accounts`, `apps/catalogue` | User directory (search, role/department changes, deactivate, reset password, create accounts); resource types (icon, colour, who may book, check-in), locations with click-to-place map pins, departments + heads |
+| System health | `/api/system/health` | Control-room strip: database, sweeper heartbeat, live notifications, email mode, Redis |
 | Calendar sync | `/api/calendar/<token>.ics` | Personal iCal feed for Google / Outlook / Apple; per-booking `.ics` |
 
 ### Acceptance criteria → evidence

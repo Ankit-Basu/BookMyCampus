@@ -1,14 +1,17 @@
 from django.conf import settings
 from django.utils import timezone
-from rest_framework import generics, viewsets
+from datetime import timedelta
+
+from django.db.models import Count, Q
+from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .models import Department, Role, User
-from .permissions import IsManager, ReadOnlyOrPolicyAdmin
-from .serializers import DepartmentSerializer, LoginSerializer, UserSerializer
+from .permissions import IsManager, IsPolicyAdmin, ReadOnlyOrPolicyAdmin
+from .serializers import AdminUserSerializer, DepartmentSerializer, LoginSerializer, UserSerializer
 
 
 class LoginView(TokenObtainPairView):
@@ -28,12 +31,37 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     permission_classes = [ReadOnlyOrPolicyAdmin]
 
 
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
+class UserViewSet(mixins.CreateModelMixin, mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
+    """
+    People directory. Every manager can search it; facility managers and admins can also create
+    accounts, change role / department, reset passwords and (de)activate users.
+    """
+
     queryset = User.objects.select_related("department").order_by("first_name")
     serializer_class = UserSerializer
     permission_classes = [IsManager]
-    filterset_fields = ["role", "department"]
+    filterset_fields = ["role", "department", "is_active"]
     search_fields = ["username", "first_name", "last_name", "email"]
+
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update"):
+            return [IsPolicyAdmin()]
+        return super().get_permissions()
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update") or self.request.query_params.get("directory") == "1":
+            return AdminUserSerializer
+        return UserSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.query_params.get("directory") == "1" or self.action in ("update", "partial_update"):
+            since = timezone.now() - timedelta(days=30)
+            qs = qs.annotate(
+                booking_count=Count("bookings", distinct=True),
+                noshows_30d=Count("noshows", filter=Q(noshows__recorded_at__gte=since, noshows__waived=False), distinct=True),
+            )
+        return qs
 
     @action(detail=False)
     def restricted(self, request):

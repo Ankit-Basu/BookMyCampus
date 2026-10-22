@@ -27,6 +27,7 @@ from .exceptions import BookingError, RuleViolation, SlotConflict, is_deadlock, 
 from .models import Booking, BookingAttempt, BookingSlot, CheckIn, NoShow, RecurrenceRule
 
 MAX_OCCURRENCES = 52
+DEADLOCK_RETRIES = 25
 
 
 def tsrange(start, end):
@@ -69,7 +70,7 @@ def _insert(user, resource, start, end, *, title, purpose="", on_behalf_of="", a
     from apps.approvals.services import attach_workflow, resolve_workflow
 
     workflow = resolve_workflow(resource, user)
-    for attempt in range(8):
+    for attempt in range(DEADLOCK_RETRIES):
         try:
             booking = _claim(user, resource, start, end, workflow, title=title, purpose=purpose,
                              on_behalf_of=on_behalf_of, attendees=attendees, recurrence=recurrence, index=index)
@@ -78,9 +79,10 @@ def _insert(user, resource, start, end, *, title, purpose="", on_behalf_of="", a
             # Two inserts that race on the same GiST key each wait for the other's verdict;
             # PostgreSQL breaks the tie by aborting one ("deadlock detected"). The savepoint is
             # rolled back, and the retry now sees the winner's committed row → clean 409.
-            if not is_deadlock(exc) or attempt == 7:
+            if not is_deadlock(exc) or attempt == DEADLOCK_RETRIES - 1:
                 raise
-            time.sleep(random.uniform(0.005, 0.05) * (attempt + 1))
+            # exponential backoff with full jitter, so retrying requests stop colliding in lockstep
+            time.sleep(random.uniform(0, min(0.4, 0.01 * 2**attempt)))
     if workflow:
         attach_workflow(booking, workflow)
     return booking

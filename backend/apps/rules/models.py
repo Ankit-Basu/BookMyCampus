@@ -96,6 +96,8 @@ class Policy(models.Model):
     restrict_days_level1 = models.PositiveIntegerField(default=7)
     strike_level2 = models.PositiveIntegerField(default=5)
     restrict_days_level2 = models.PositiveIntegerField(default=30)
+    # Stamped by every sweeper run (thread, management command or Celery) — powers the health strip.
+    last_sweep_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         verbose_name_plural = "policy"

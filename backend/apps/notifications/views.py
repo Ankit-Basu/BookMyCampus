@@ -1,4 +1,10 @@
+import json
+import time
+
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils import timezone
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -32,3 +38,38 @@ class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def read_all(self, request):
         Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
         return Response({"ok": True})
+
+
+def stream(request):
+    """
+    Server-Sent Events: pushes each new notification to the browser the moment it is written, so
+    approvals, auto-releases and reminders appear instantly instead of on the next poll.
+    EventSource can't send headers, so the (short-lived) access token rides in the query string.
+    """
+    try:
+        user_id = AccessToken(request.GET.get("token", ""))["user_id"]
+    except (TokenError, KeyError):
+        return HttpResponse(status=401)
+
+    last_id = Notification.objects.filter(user_id=user_id).order_by("-id").values_list("id", flat=True).first() or 0
+
+    def events():
+        nonlocal last_id
+        yield "retry: 4000\n\n"
+        started = time.monotonic()
+        beat = 0.0
+        # each connection lives ~5 minutes, then the browser transparently reconnects
+        while time.monotonic() - started < 300:
+            fresh = list(Notification.objects.filter(user_id=user_id, id__gt=last_id).order_by("id")[:20])
+            for n in fresh:
+                last_id = n.id
+                yield f"event: notification\ndata: {json.dumps(NotificationSerializer(n).data, default=str)}\n\n"
+            if time.monotonic() - beat > 15:
+                beat = time.monotonic()
+                yield ": keep-alive\n\n"
+            time.sleep(2)
+
+    resp = StreamingHttpResponse(events(), content_type="text/event-stream")
+    resp["Cache-Control"] = "no-cache"
+    resp["X-Accel-Buffering"] = "no"
+    return resp

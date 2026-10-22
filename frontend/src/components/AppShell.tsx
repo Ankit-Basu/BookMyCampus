@@ -13,8 +13,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
-import { api } from '../lib/api'
+import { api, getTokens } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { warmRoutes } from '../lib/preload'
 import { fmtRelative } from '../lib/format'
@@ -34,6 +35,39 @@ export function Wordmark({ small }: { small?: boolean }) {
   )
 }
 
+/** Subscribe to /api/notifications/stream (SSE). Reconnects with a fresh token if the stream drops. */
+function useLiveNotifications(onEvent: (n: Notification) => void) {
+  const handler = useRef(onEvent)
+  handler.current = onEvent
+  useEffect(() => {
+    let es: EventSource | null = null
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let closed = false
+    const connect = () => {
+      const token = getTokens()?.access
+      if (!token || closed) return
+      es = new EventSource(`/api/notifications/stream?token=${encodeURIComponent(token)}`)
+      es.addEventListener('notification', (e) => {
+        try {
+          handler.current(JSON.parse((e as MessageEvent).data))
+        } catch {
+          /* ignore malformed event */
+        }
+      })
+      es.onerror = () => {
+        es?.close()
+        if (!closed) timer = setTimeout(connect, 8000)
+      }
+    }
+    connect()
+    return () => {
+      closed = true
+      clearTimeout(timer)
+      es?.close()
+    }
+  }, [])
+}
+
 function Notifications() {
   const [open, setOpen] = useState(false)
   const qc = useQueryClient()
@@ -42,7 +76,16 @@ function Notifications() {
   const { data } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => api.get<{ unread: number; items: Notification[] }>('/notifications').then((r) => r.data),
-    refetchInterval: 30000,
+    refetchInterval: 120000, // fallback only — live updates arrive over Server-Sent Events below
+  })
+  useLiveNotifications((n) => {
+    qc.invalidateQueries({ queryKey: ['notifications'] })
+    if (n.kind === 'approval_required') qc.invalidateQueries({ queryKey: ['approval-queue'] })
+    if (n.booking) {
+      qc.invalidateQueries({ queryKey: ['bookings'] })
+      qc.invalidateQueries({ queryKey: ['booking', String(n.booking)] })
+    }
+    toast(n.title, { description: n.body, action: n.link ? { label: 'Open', onClick: () => nav(n.link) } : undefined })
   })
   useEffect(() => {
     const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false)

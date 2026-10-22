@@ -611,3 +611,132 @@
   margin: 0;
   vertical-align: middle;
 }
+
+/* ==========================================================================
+   Admin completeness: health strip, master data, resource actions
+   ========================================================================== */
+.health-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.health-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.md-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.md-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 14%, transparent), rgba(255, 255, 255, 0.03));
+  border: 1px solid color-mix(in srgb, var(--c) 30%, rgba(255, 255, 255, 0.08));
+}
+.md-icon {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 90%, white), color-mix(in srgb, var(--c) 65%, black));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 0 color-mix(in srgb, var(--c) 40%, black);
+}
+.swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.swatch.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+}
+.swatch-input {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+}
+.picker-map {
+  height: 280px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.rhero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.maint-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  border-color: rgba(255, 111, 89, 0.45);
+  background: linear-gradient(120deg, rgba(255, 111, 89, 0.16), rgba(255, 255, 255, 0.03));
+}
+@media (max-width: 1100px) {
+  .health-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---- equal-height resource cards: every card in a row matches, tags pinned to the bottom */
+.rgrid {
+  align-items: stretch;
+}
+.rcell,
+.rcell > .tilt,
+.rcell .rcard,
+.rcell .glare-hover {
+  height: 100%;
+}
+.rcard-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.rcard-img {
+  flex: none;
+}
+.rcard-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.rcard-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  /* overflowing feature tags fade out instead of wrapping to a second line */
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+.rcard-tags > .tag {
+  flex: none;
+}

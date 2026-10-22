@@ -135,7 +135,15 @@ CORS_ALLOWED_ORIGINS = [
     o.strip() for o in env("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
 ]
 
+# Console in dev. For real delivery set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# plus EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (e.g. a Gmail app password).
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "BookMyCampus <no-reply@bookmycampus.local>")
 
 # Public base URL of the SPA, used inside QR codes and notification links.
@@ -149,9 +157,7 @@ CELERY_BROKER_URL = env("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = None
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
-    "auto-release-no-shows": {"task": "apps.bookings.tasks.auto_release_sweep", "schedule": 60.0},
-    "booking-reminders": {"task": "apps.bookings.tasks.send_reminders", "schedule": 300.0},
-    "complete-finished": {"task": "apps.bookings.tasks.complete_finished", "schedule": 300.0},
+    "sweep": {"task": "apps.bookings.tasks.sweep", "schedule": 60.0},
     "utilisation-snapshot": {"task": "apps.analytics.tasks.nightly_snapshot", "schedule": 3600.0},
     "timetable-refresh": {"task": "apps.timetable.tasks.refresh_timetable", "schedule": 900.0},
 }
@@ -168,3 +174,7 @@ DEMO_PASSWORD = env("DEMO_PASSWORD", "campus123")
 
 # Shared secret P13 sends in X-Timetable-Token when it republishes the timetable.
 TIMETABLE_WEBHOOK_TOKEN = env("TIMETABLE_WEBHOOK_TOKEN", "")
+
+# Run the auto-release / reminder sweeper inside `runserver` (no extra terminal needed in dev).
+AUTO_SWEEP = env_bool("AUTO_SWEEP", DEBUG)
+AUTO_SWEEP_INTERVAL = int(env("AUTO_SWEEP_INTERVAL", "30"))

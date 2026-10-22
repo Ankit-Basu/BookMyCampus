@@ -1,10 +1,16 @@
 import {
   Basketball,
+  Camera,
   ChalkboardTeacher,
   Cube,
+  Desktop,
   Flask,
   Microscope,
+  MusicNotes,
+  Printer,
   PresentationChart,
+  Robot,
+  SwimmingPool,
   UsersThree,
   Van,
   X,
@@ -23,7 +29,16 @@ const ICONS: Record<string, typeof Cube> = {
   basketball: Basketball,
   'users-three': UsersThree,
   van: Van,
+  desktop: Desktop,
+  printer: Printer,
+  camera: Camera,
+  robot: Robot,
+  music: MusicNotes,
+  pool: SwimmingPool,
+  cube: Cube,
 }
+
+export const ICON_KEYS = Object.keys(ICONS)
 
 export function TypeIcon({ icon, size = 18, color }: { icon?: string; size?: number; color?: string }) {
   const I = (icon && ICONS[icon]) || Cube

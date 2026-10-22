@@ -30,7 +30,7 @@ export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Re
     <div className="rcell card-in" style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}>
       <Tilt max={5}>
         <Link to={`/resources/${r.id}`} className="rcard" onPointerEnter={prefetch} onFocus={prefetch} style={{ '--c': r.type_color } as CSSProperties}>
-          <GlareHover glareColor="#ffffff" glareOpacity={0.18} glareAngle={-35} glareSize={260} transitionDuration={700} background="transparent" borderColor="transparent" borderRadius="20px" width="100%" height="auto">
+          <GlareHover glareColor="#ffffff" glareOpacity={0.18} glareAngle={-35} glareSize={260} transitionDuration={700} background="transparent" borderColor="transparent" borderRadius="20px" width="100%" height="100%">
             <div className="rcard-inner">
               <div className="rcard-img">
                 {r.cover ? <img src={r.cover.replace('w=1200', 'w=640')} alt="" loading="lazy" decoding="async" /> : <div className="stripes" style={{ height: '100%' }} />}
@@ -47,7 +47,7 @@ export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Re
                   </div>
                   <span className="mono muted" style={{ fontSize: 10.5, whiteSpace: 'nowrap' }}>{r.code}</span>
                 </div>
-                <div className="row wrap" style={{ gap: 6, marginTop: 12 }}>
+                <div className="rcard-tags">
                   <span className="tag"><UsersThree size={12} /> {r.capacity}</span>
                   {r.requires_approval ? (
                     <span className="tag" style={{ '--c': 'var(--amber)' } as CSSProperties}><Stamp size={12} /> Approval</span>

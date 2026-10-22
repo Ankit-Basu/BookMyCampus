@@ -1,10 +1,10 @@
-import { ArrowCounterClockwise, CheckCircle, Package, Plus, UploadSimple, Wrench, X } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, CheckCircle, Package, PencilSimple, Plus, Trash, UploadSimple, Wrench, X } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { useState, type CSSProperties } from 'react'
 import { toast } from 'sonner'
 
-import { Meter, Modal, StatusTag } from '../../components/ui'
+import { Drawer, Meter, Modal, StatusTag } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { isPolicyAdmin, useAuth } from '../../lib/auth'
 import { fmtRelative, WEEKDAYS } from '../../lib/format'
@@ -76,14 +76,120 @@ function Maintenance() {
   )
 }
 
+type Item = {
+  id?: number
+  name: string
+  sku: string
+  kind: string
+  unit: string
+  stock: number
+  reorder_level: number
+  unit_cost: number
+  resource: number | null
+  resource_type: number | null
+}
+
+function ItemEditor({ item, onClose }: { item: Item | null; onClose: () => void }) {
+  const qc = useQueryClient()
+  const { data: resources } = useQuery({ queryKey: ['resources', 'admin-min'], queryFn: () => api.get<Resource[]>('/resources').then((r) => r.data) })
+  const { data: types } = useQuery({ queryKey: ['types'], queryFn: () => api.get<{ id: number; name: string }[]>('/resource-types').then((r) => r.data) })
+  const done = (msg: string) => () => {
+    qc.invalidateQueries({ queryKey: ['consumables'] })
+    toast.success(msg)
+    onClose()
+  }
+  const save = useMutation({
+    mutationFn: (b: Item) => (b.id ? api.patch(`/consumables/${b.id}`, b) : api.post('/consumables', b)),
+    onSuccess: done('Saved'),
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  const remove = useMutation({ mutationFn: (id: number) => api.delete(`/consumables/${id}`), onSuccess: done('Deleted'), onError: (e) => toast.error(errorMessage(e)) })
+  return (
+    <Drawer open={!!item} onClose={onClose} title={item?.id ? `Edit ${item.name}` : 'New consumable / accessory'}>
+      {item && (
+        <form
+          key={item.id ?? 'new'}
+          className="col"
+          style={{ gap: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault()
+            const f = new FormData(e.currentTarget)
+            const link = String(f.get('link'))
+            save.mutate({
+              id: item.id,
+              name: String(f.get('name')),
+              sku: String(f.get('sku')),
+              kind: String(f.get('kind')),
+              unit: String(f.get('unit')),
+              stock: Number(f.get('stock')),
+              reorder_level: Number(f.get('reorder_level')),
+              unit_cost: Number(f.get('unit_cost')),
+              resource: link.startsWith('r:') ? Number(link.slice(2)) : null,
+              resource_type: link.startsWith('t:') ? Number(link.slice(2)) : null,
+            })
+          }}
+        >
+          <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+            <label className="field"><span>Name</span><input name="name" className="input" defaultValue={item.name} required placeholder="Soldering tips (pack)" /></label>
+            <label className="field"><span>SKU</span><input name="sku" className="input mono" defaultValue={item.sku} required placeholder="ECE-TIP" /></label>
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label className="field">
+              <span>Kind</span>
+              <select name="kind" className="input" defaultValue={item.kind}>
+                <option value="consumable">Consumable — used up</option>
+                <option value="accessory">Accessory — returned</option>
+              </select>
+            </label>
+            <label className="field"><span>Unit</span><input name="unit" className="input" defaultValue={item.unit} placeholder="pcs, boxes, ml" /></label>
+          </div>
+          <label className="field">
+            <span>Issued with</span>
+            <select name="link" className="input" defaultValue={item.resource ? `r:${item.resource}` : item.resource_type ? `t:${item.resource_type}` : ''}>
+              <option value="">Anything (general stock)</option>
+              <optgroup label="Every resource of a type">
+                {types?.map((t) => <option key={t.id} value={`t:${t.id}`}>{t.name}</option>)}
+              </optgroup>
+              <optgroup label="One specific resource">
+                {resources?.map((r) => <option key={r.id} value={`r:${r.id}`}>{r.code} — {r.name}</option>)}
+              </optgroup>
+            </select>
+          </label>
+          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <label className="field"><span>In stock</span><input name="stock" type="number" min={0} className="input mono" defaultValue={item.stock} /></label>
+            <label className="field"><span>Alert at ≤</span><input name="reorder_level" type="number" min={0} className="input mono" defaultValue={item.reorder_level} /></label>
+            <label className="field"><span>Unit cost ₹</span><input name="unit_cost" type="number" min={0} className="input mono" defaultValue={item.unit_cost} /></label>
+          </div>
+          <div className="row">
+            {item.id && (
+              <button type="button" className="key key-coral" onClick={() => { if (confirm(`Delete ${item.name}?`)) remove.mutate(item.id!) }}>
+                <Trash />
+              </button>
+            )}
+            <div className="grow" />
+            <button className="key key-amber" disabled={save.isPending}>Save item</button>
+          </div>
+        </form>
+      )}
+    </Drawer>
+  )
+}
+
 function Consumables() {
+  const [editing, setEditing] = useState<Item | null>(null)
   const { data } = useQuery({ queryKey: ['consumables'], queryFn: () => api.get('/consumables').then((r) => r.data) })
   const { data: open } = useQuery({ queryKey: ['issuances'], queryFn: () => api.get('/issuances', { params: { open: 1 } }).then((r) => r.data) })
   const restock = useMutation({ mutationFn: ({ id, q }: { id: number; q: number }) => api.post(`/consumables/${id}/restock`, { quantity: q }), ...useAct(['consumables'], 'Restocked') })
   const ret = useMutation({ mutationFn: (id: number) => api.post(`/issuances/${id}/return`), ...useAct(['issuances', 'consumables'], 'Returned to stock') })
-  type C = { id: number; name: string; sku: string; kind: string; unit: string; stock: number; reorder_level: number; is_low: boolean; resource_name: string | null; resource_type_name: string | null; issued_out: number }
+  type C = Item & { id: number; is_low: boolean; resource_name: string | null; resource_type_name: string | null; issued_out: number }
+  const blank: Item = { name: '', sku: '', kind: 'consumable', unit: 'pcs', stock: 10, reorder_level: 3, unit_cost: 0, resource: null, resource_type: null }
   return (
     <div className="col" style={{ gap: 18 }}>
+      <div className="spread">
+        <span className="muted" style={{ fontSize: 13 }}>{data?.length ?? 0} items · {data?.filter((c: C) => c.is_low).length ?? 0} low</span>
+        <button className="key key-amber key-sm" onClick={() => setEditing(blank)}><Plus weight="bold" /> New item</button>
+      </div>
+      <ItemEditor item={editing} onClose={() => setEditing(null)} />
       <div className="stock-grid">
         {data?.map((c: C) => (
           <div key={c.id} className={`glass pad stock-card ${c.is_low ? 'low' : ''}`}>
@@ -102,9 +208,12 @@ function Consumables() {
             <Meter value={Math.min(1, c.stock / Math.max(c.reorder_level * 3, 1))} c1={c.is_low ? '#7a1f12' : undefined} c2={c.is_low ? '#ff6f59' : undefined} />
             <div className="spread" style={{ marginTop: 12 }}>
               <span className="mono muted" style={{ fontSize: 11 }}>reorder at {c.reorder_level}</span>
-              <button className="key key-ghost key-sm" onClick={() => { const q = Number(prompt(`Restock ${c.name} — how many ${c.unit}?`, '10')); if (q > 0) restock.mutate({ id: c.id, q }) }}>
-                <Plus /> Restock
-              </button>
+              <div className="row" style={{ gap: 6 }}>
+                <button className="key key-ghost key-sm key-icon" title="Edit" onClick={() => setEditing(c)}><PencilSimple size={14} /></button>
+                <button className="key key-ghost key-sm" onClick={() => { const q = Number(prompt(`Restock ${c.name} — how many ${c.unit}?`, '10')); if (q > 0) restock.mutate({ id: c.id, q }) }}>
+                  <Plus /> Restock
+                </button>
+              </div>
             </div>
           </div>
         ))}

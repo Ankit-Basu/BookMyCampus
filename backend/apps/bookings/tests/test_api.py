@@ -249,3 +249,71 @@ class ApiTest(APITestCase):
 
     def test_scheduler_command_runs(self):
         call_command("run_scheduler", once=True)
+
+
+class AdminCompletenessTest(APITestCase):
+    """People directory, master data guards, live notifications, health + sweeper heartbeat."""
+
+    def setUp(self):
+        self.dept, self.rtype, self.lab, self.custodian = make_campus()
+        self.student = make_user("stud", Role.STUDENT, self.dept)
+        self.manager = make_user("mgr", Role.FACILITY_MANAGER, self.dept)
+
+    def test_only_policy_admins_edit_people(self):
+        self.client.force_authenticate(self.custodian)
+        self.assertEqual(self.client.get("/api/users", {"directory": 1}).status_code, 200)
+        self.assertEqual(self.client.patch(f"/api/users/{self.student.id}", {"role": "custodian"}, format="json").status_code, 403)
+        self.client.force_authenticate(self.manager)
+        r = self.client.patch(f"/api/users/{self.student.id}", {"role": "custodian"}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.role, Role.CUSTODIAN)
+
+    def test_cannot_change_own_role_or_deactivate_self(self):
+        self.client.force_authenticate(self.manager)
+        self.assertEqual(self.client.patch(f"/api/users/{self.manager.id}", {"role": "student"}, format="json").status_code, 400)
+        self.assertEqual(self.client.patch(f"/api/users/{self.manager.id}", {"is_active": False}, format="json").status_code, 400)
+
+    def test_create_account_with_password(self):
+        self.client.force_authenticate(self.manager)
+        r = self.client.post(
+            "/api/users",
+            {"username": "12215634", "first_name": "New", "role": "student", "department": self.dept.id, "password": "s3cret-pass"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        self.client.force_authenticate(None)
+        login = self.client.post("/api/auth/login", {"username": "12215634", "password": "s3cret-pass"}, format="json")
+        self.assertEqual(login.status_code, 200)
+
+    def test_deleting_type_in_use_is_409(self):
+        self.client.force_authenticate(self.manager)
+        r = self.client.delete(f"/api/resource-types/{self.rtype.id}")
+        self.assertEqual((r.status_code, r.data["error"]), (409, "in_use"))
+
+    def test_location_pin_is_editable(self):
+        self.client.force_authenticate(self.manager)
+        r = self.client.post("/api/locations", {"building": "Block 37", "latitude": "31.255", "longitude": "75.705"}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+
+    def test_health_and_sweeper_heartbeat(self):
+        from apps.bookings.sweeper import sweep_once
+        from apps.rules.models import Policy
+
+        self.client.force_authenticate(self.manager)
+        self.assertFalse(self.client.get("/api/system/health").data["sweeper"]["healthy"])
+        sweep_once()
+        self.assertIsNotNone(Policy.get().last_sweep_at)
+        self.assertTrue(self.client.get("/api/system/health").data["sweeper"]["healthy"])
+
+    def test_notification_stream(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        self.assertEqual(self.client.get("/api/notifications/stream").status_code, 401)
+        token = str(AccessToken.for_user(self.student))
+        r = self.client.get("/api/notifications/stream", {"token": token})
+        self.assertEqual(r["Content-Type"], "text/event-stream")
+        chunks = iter(r.streaming_content)
+        self.assertIn(b"retry", next(chunks))
+        Notification.objects.create(user=self.student, title="Approved: AI Lab")
+        self.assertIn(b"Approved: AI Lab", next(chunks))

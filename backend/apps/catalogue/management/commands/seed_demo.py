@@ -88,6 +88,14 @@ class Command(BaseCommand):
         self.history()
         self.upcoming()
         self.maintenance()
+        # Seeding fires real notifications; keep only the demo personas' inboxes (the background
+        # crowd has no email and nobody logs in as them), and mark seeded history as already read.
+        Notification.objects.exclude(user__username__startswith="demo.").exclude(
+            user__in=[self.custodian2, self.sports]
+        ).delete()
+        for uid in Notification.objects.values_list("user_id", flat=True).distinct():
+            fresh = list(Notification.objects.filter(user_id=uid).order_by("-id").values_list("id", flat=True)[:3])
+            Notification.objects.filter(user_id=uid).exclude(id__in=fresh).update(read_at=timezone.now())
         self.stdout.write(self.style.SUCCESS(
             f"Seeded {Resource.objects.count()} resources · {Booking.objects.count()} bookings · "
             f"{TimetableEntry.objects.count()} timetable entries. Demo password: {settings.DEMO_PASSWORD}"
