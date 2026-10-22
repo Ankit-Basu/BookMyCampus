@@ -1,0 +1,7 @@
+version: 2
+secret:
+  ignored_paths:
+    - "**/tests/**"
+    - "**/tests.py"
+    - "backend/apps/*/tests/**"
+    - "backend/apps/*/tests.py"

@@ -276,14 +276,15 @@ class AdminCompletenessTest(APITestCase):
 
     def test_create_account_with_password(self):
         self.client.force_authenticate(self.manager)
+        mock_password = "mock-unit-test-password-123"
         r = self.client.post(
             "/api/users",
-            {"username": "12215634", "first_name": "New", "role": "student", "department": self.dept.id, "password": "s3cret-pass"},
+            {"username": "12215634", "first_name": "New", "role": "student", "department": self.dept.id, "password": mock_password},
             format="json",
         )
         self.assertEqual(r.status_code, 201, r.data)
         self.client.force_authenticate(None)
-        login = self.client.post("/api/auth/login", {"username": "12215634", "password": "s3cret-pass"}, format="json")
+        login = self.client.post("/api/auth/login", {"username": "12215634", "password": mock_password}, format="json")
         self.assertEqual(login.status_code, 200)
 
     def test_deleting_type_in_use_is_409(self):
