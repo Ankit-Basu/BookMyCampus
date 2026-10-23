@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 backend/.venv/
 backend/.env
+.env
+.env.*
+*.env
 /.venv/
 /apps
 backend/media/

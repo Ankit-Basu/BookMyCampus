@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.consumables",
     "apps.analytics",
     "apps.notifications",
+    "apps.ai_assistant",
 ]
 
 MIDDLEWARE = [
@@ -178,3 +179,8 @@ TIMETABLE_WEBHOOK_TOKEN = env("TIMETABLE_WEBHOOK_TOKEN", "")
 # Run the auto-release / reminder sweeper inside `runserver` (no extra terminal needed in dev).
 AUTO_SWEEP = env_bool("AUTO_SWEEP", DEBUG)
 AUTO_SWEEP_INTERVAL = int(env("AUTO_SWEEP_INTERVAL", "30"))
+
+# AI Copilot (Groq API Key Pool & Rotator)
+GROQ_API_KEYS = [k.strip() for k in env("GROQ_API_KEYS", "").split(",") if k.strip()]
+GROQ_MODEL = env("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_FALLBACK_MODELS = [m.strip() for m in env("GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]

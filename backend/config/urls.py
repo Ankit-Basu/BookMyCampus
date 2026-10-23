@@ -54,6 +54,7 @@ api = [
     path("analytics/approvals", analytics.approvals),
     path("analytics/downtime", analytics.downtime),
     path("analytics/quotas", analytics.quotas),
+    path("ai/", include("apps.ai_assistant.urls")),
     path("", include(router.urls)),
 ]
 

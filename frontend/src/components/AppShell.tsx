@@ -22,6 +22,7 @@ import { fmtRelative } from '../lib/format'
 import type { Notification } from '../lib/types'
 import Backdrop, { Sparks } from './Backdrop'
 import Dock, { type DockItemData } from './reactbits/Dock'
+import CampusCopilot from './ai/CampusCopilot'
 
 export function Wordmark({ small }: { small?: boolean }) {
   return (
@@ -219,17 +220,20 @@ export default function AppShell() {
         <Outlet />
       </motion.main>
       {user && (
-        <div className="dock-host">
-          <Dock
-            items={items}
-            baseItemSize={46}
-            magnification={66}
-            panelHeight={62}
-            accentColor="#f5a524"
-            badgeColor="#ff6f59"
-            distance={170}
-          />
-        </div>
+        <>
+          <CampusCopilot />
+          <div className="dock-host">
+            <Dock
+              items={items}
+              baseItemSize={46}
+              magnification={66}
+              panelHeight={62}
+              accentColor="#f5a524"
+              badgeColor="#ff6f59"
+              distance={170}
+            />
+          </div>
+        </>
       )}
     </>
   )
