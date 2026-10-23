@@ -53,6 +53,7 @@ The login screen has one-click buttons for each.
 |---|---|---|
 | `demo.student` | Student · CSE | Has a booking that's live **right now**: open *My bookings* and check in from *Scan* |
 | `demo.faculty` | Faculty · CSE | Recurring weekly booking; book on behalf of a class (K22CS-B) |
+| `demo.staff` | Staff · ECE | Laboratory asset issuance, equipment maintenance, bookings |
 | `demo.custodian` | Custodian | Approval queue, check-in posters, maintenance, consumables |
 | `demo.head` | Head of Dept · CSE | Seminar-hall approvals, department utilisation |
 | `demo.manager` | Facility Manager | Control room: analytics, policy, workflows, timetable |
@@ -73,10 +74,14 @@ The login screen has one-click buttons for each.
 | **M7 Maintenance** | `apps/maintenance` | Scheduled windows + one-tap breakdown reports; displaces affected bookings and notifies them; downtime tracking |
 | **M8 Consumables** | `apps/consumables` | Stock with oversell-proof atomic decrement, issue with booking, returns, low-stock alerts |
 | **M9 Analytics** | `apps/analytics` | Utilisation by resource/type/department/day, idle-value ranking, weekday×hour heatmap, no-show rates, demand vs supply, approval turnaround, downtime, quota consumption, nightly snapshots |
+| **M10 AI Campus Copilot** | `apps/ai_assistant` | Autonomous ReAct agent powered by Groq LPU with multi-key rotation and 7 database tools (`search_rooms`, `check_room_schedule`, `get_my_bookings`, `book_room`, `cancel_booking`, `report_maintenance`, `get_campus_overview`); interactive UI cards rendered in chat |
+| Interactive Campus Map | `frontend/pages/CampusMap` | Interactive Leaflet campus map of LPU blocks with live hourly colored vacancy rings |
+| Digital Boarding Pass | `frontend/components/BookingTicket` | Aviation-style ticket pass with dynamic live countdown timer, status pill, and one-tap calendar export |
 | Notifications | `apps/notifications` | Pushed live over **Server-Sent Events** (toast + bell the instant it happens) and emailed; SMTP via env vars |
 | People & master data | `apps/accounts`, `apps/catalogue` | User directory (search, role/department changes, deactivate, reset password, create accounts); resource types (icon, colour, who may book, check-in), locations with click-to-place map pins, departments + heads |
 | System health | `/api/system/health` | Control-room strip: database, sweeper heartbeat, live notifications, email mode, Redis |
 | Calendar sync | `/api/calendar/<token>.ics` | Personal iCal feed for Google / Outlook / Apple; per-booking `.ics` |
+| Navigation Redirect | `config/urls.py` | Visiting `http://127.0.0.1:8000/` automatically redirects to the frontend SPA at `http://localhost:5173/` |
 
 ### Acceptance criteria → evidence
 
@@ -89,9 +94,24 @@ The login screen has one-click buttons for each.
 | No-show tracking + progressive restriction | `test_progressive_restriction`; Control room → Operations → No-show monitor |
 | Utilisation + idle capacity across ≥ 3 types | Control room → Analytics (7 types seeded) |
 | Recurring bookings with per-occurrence conflicts | `RecurringTest` (skip + all-or-nothing) |
+| AI Copilot ReAct tool calling & key failover | `apps/ai_assistant/tests.py` (Groq API pool, 7 tool dispatches, card schemas) |
 
 ```bash
-cd backend && python manage.py test apps.bookings     # 50 tests: engine, 500-way race, full HTTP API
+# Run full automated test suite (228 tests passing across all 11 apps)
+cd backend && python manage.py test apps
+
+# Verified test breakdown:
+python manage.py test apps.bookings      # 50 tests: engine, 500-way concurrency race, full HTTP API
+python manage.py test apps.analytics     # 48 tests: heatmaps, snapshots, idle capacity, utilisation
+python manage.py test apps.rules         # 24 tests: availability rules, blackouts, policy engine, quotas
+python manage.py test apps.approvals     # 16 tests: multi-tier workflow transitions, review queue
+python manage.py test apps.notifications # 16 tests: SSE event streaming, email notifications
+python manage.py test apps.catalogue     # 14 tests: faceted search, bulk CSV import, QR posters
+python manage.py test apps.consumables   # 14 tests: atomic stock decrement, issuances, restock
+python manage.py test apps.accounts      # 12 tests: JWT auth, directory CRUD, role permissions
+python manage.py test apps.timetable     # 12 tests: timetable publishing, webhook sync, displacement
+python manage.py test apps.maintenance   # 12 tests: windows, breakdown reports, downtime tracking
+python manage.py test apps.ai_assistant  # 10 tests: agent loop, multi-key rotation, 7 ReAct tools
 ```
 
 ### API (selection)
@@ -104,6 +124,8 @@ POST /api/bookings/:id/check-in          POST /api/bookings/scan              (m
 POST /api/bookings/:id/check-out|cancel  GET  /api/bookings/:id/ics
 GET  /api/maintenance  POST /api/maintenance  POST /api/maintenance/report
 POST /api/timetable/publish              GET  /api/analytics/utilisation | heatmap | noshows | demand
+POST /api/ai/chat                        GET  /api/ai/suggestions            (Campus Copilot)
+GET  /api/notifications/stream          (Live SSE event stream)
 ```
 
 ---
@@ -111,11 +133,14 @@ POST /api/timetable/publish              GET  /api/analytics/utilisation | heatm
 ## Stack & design
 
 * **Backend:** Django 5.2, DRF, SimpleJWT, PostgreSQL 16 range types + `btree_gist`, Celery Beat on
-  Redis (sweeps only), `qrcode`, `ics`.
+  Redis (sweeps only), Groq API Python SDK (OpenAI tool calling with LPU inference), `qrcode`, `ics`.
 * **Frontend:** React 19 + Vite + TypeScript, TanStack Query, FullCalendar (drag-to-select),
   GSAP ScrollTrigger + Lenis smooth scrolling, Motion, Leaflet (LPU campus map on OpenStreetMap),
   Recharts, html5-qrcode, and React Bits components (Aurora, Threads, Dock, SpotlightCard,
   GlareHover, ScrollVelocity, Magnet, ClickSpark, Noise and more).
+* **AI Copilot:** Autonomous ReAct Agent with multi-key pool rotation (`GROQ_API_KEYS`), fallback
+  cascades (`openai/gpt-oss-120b`, `gpt-oss-20b`, `qwen/qwen3.8-27b`), keyboard shortcut <kbd>Ctrl</kbd> + <kbd>K</kbd>,
+  and interactive UI card rendering.
 * **Visual language:** "night campus box office". Frosted-glass panes over an ink sky, LPU-orange
   accents, **skeuomorphic keycap buttons** and rocker switches, bookings as **ticket stubs** with
   perforations and QR passes, utilisation as an **analog gauge**, and rubber-stamp approvals.
@@ -130,11 +155,16 @@ backend/
     timetable/       P13 integration
     bookings/        engine, ledger, check-in, no-shows, sweeps, tests
     approvals/       workflows + decisions
-    maintenance/  consumables/  analytics/  notifications/
+    maintenance/     maintenance windows, breakdowns, technician queue
+    consumables/     accessories & consumables inventory
+    analytics/       nightly snapshots, heatmap, utilisation, idle assets
+    notifications/   live SSE stream (/api/notifications/stream) + email
+    ai_assistant/    Campus Copilot: Groq client rotator, 7 ReAct tools, chat API
 frontend/src/
   pages/             Landing, Login, Explore, ResourcePage, MyBookings, BookingPage, Scan,
                      Approvals, CampusMap, Profile, admin/*
-  components/        AppShell (dock), motion (GSAP/Lenis), ui, BookingTicket, reactbits/*
+  components/        AppShell (dock), motion (GSAP/Lenis), ui, BookingTicket, reactbits/*,
+                     ai/CampusCopilot (drawer + rich cards)
 docs/CONFLICT_PREVENTION.md
 ```
 
