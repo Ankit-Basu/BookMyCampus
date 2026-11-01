@@ -1,38 +1,103 @@
 import {
   Bell,
+  CaretDown,
   ChartPieSlice,
+  Check,
   MagnifyingGlass,
   MapTrifold,
+  Moon,
   QrCode,
   SignOut,
   Stamp,
+  Sun,
   Ticket,
   UserCircle,
 } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/shadcn/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/shadcn/popover'
 
 import { api, getTokens } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { warmRoutes } from '../lib/preload'
 import { fmtRelative } from '../lib/format'
+import { warmRoutes } from '../lib/preload'
+import { useTheme } from '../lib/theme'
+import { THEMES } from '../lib/themes'
 import type { Notification } from '../lib/types'
-import Backdrop, { Sparks } from './Backdrop'
-import Dock, { type DockItemData } from './reactbits/Dock'
 import CampusCopilot from './ai/CampusCopilot'
+import Backdrop, { Sparks } from './Backdrop'
+import CommandPalette, { type NavEntry } from './CommandPalette'
 
 export function Wordmark({ small }: { small?: boolean }) {
   return (
-    <Link to="/" className="wordmark" style={small ? { fontSize: 15 } : undefined}>
-      <img src="/favicon.svg" width={small ? 26 : 30} height={small ? 26 : 30} alt="" />
-      <span>
+    <Link to="/" className={`wordmark ${small ? 'small' : ''}`}>
+      <svg viewBox="0 0 34 24" width={small ? 27 : 32} height={small ? 19 : 23} aria-hidden>
+        <path
+          d="M4 0h26a4 4 0 0 1 4 4v4.2a3.8 3.8 0 0 0 0 7.6V20a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4v-4.2a3.8 3.8 0 0 0 0-7.6V4a4 4 0 0 1 4-4Z"
+          fill="var(--brand)"
+        />
+        <path d="M23 4v16" stroke="var(--brand-fg)" strokeWidth="1.6" strokeDasharray="2 2.4" />
+        <path d="M9 7v10m0-10h4.2a2.5 2.5 0 0 1 0 5H9m0 0h5a2.5 2.5 0 0 1 0 5H9" fill="none" stroke="var(--brand-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="wordmark-text">
         BookMy<i>Campus</i>
       </span>
       <span className="lpu-badge">LPU</span>
     </Link>
+  )
+}
+
+/** Six tweakcn palettes + light/dark. Switching recolours the UI and re-renders the shader backdrop. */
+export function ThemeMenu() {
+  const { theme, mode, meta, setTheme, toggleMode } = useTheme()
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="theme-btn" aria-label={`Colour theme: ${meta.label}`}>
+          <span className="swatch-stack">
+            {meta.modes[mode].swatches.map((c) => (
+              <i key={c} style={{ background: c }} />
+            ))}
+          </span>
+          <span className="theme-name">{meta.label}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={10} className="pop-glass theme-pop">
+        <div className="spread" style={{ marginBottom: 12 }}>
+          <span className="eyebrow">Colour theme</span>
+          <button className="mode-toggle" onClick={() => toggleMode()} aria-label="Toggle light and dark mode">
+            <span className={mode === 'light' ? 'on' : ''}><Sun size={14} weight="bold" /></span>
+            <span className={mode === 'dark' ? 'on' : ''}><Moon size={14} weight="bold" /></span>
+          </button>
+        </div>
+        <div className="theme-grid">
+          {THEMES.map((t) => (
+            <button key={t.id} className={`theme-card ${t.id === theme ? 'on' : ''}`} onClick={() => setTheme(t.id)}>
+              <span className="swatch-stack">
+                {t.modes[mode].swatches.map((c) => (
+                  <i key={c} style={{ background: c }} />
+                ))}
+              </span>
+              <strong>{t.label}</strong>
+              <small>{t.blurb}</small>
+              {t.id === theme && <Check className="theme-check" size={13} weight="bold" />}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -105,7 +170,7 @@ function Notifications() {
   }
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button className="key key-ghost key-icon" onClick={() => setOpen((o) => !o)} aria-label="Notifications">
+      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Notifications">
         <Bell size={18} weight={data?.unread ? 'fill' : 'regular'} />
         {!!data?.unread && <span className="bell-count mono">{data.unread > 9 ? '9+' : data.unread}</span>}
       </button>
@@ -147,11 +212,12 @@ function Notifications() {
   )
 }
 
-/** Persistent layout: backdrop, top bar and dock stay mounted while pages swap underneath. */
+/** Persistent layout: backdrop and nav stay mounted while pages swap underneath. */
 export default function AppShell() {
   const { user, logout } = useAuth()
   const nav = useNavigate()
   const { pathname } = useLocation()
+  const [palette, setPalette] = useState(false)
   const { data: queue } = useQuery({
     queryKey: ['approval-queue'],
     queryFn: () => api.get<unknown[]>('/approvals/queue').then((r) => r.data),
@@ -163,26 +229,23 @@ export default function AppShell() {
     if (user) warmRoutes(user.is_manager)
   }, [user])
 
-  const at = (p: string) => pathname === p || pathname.startsWith(p + '/')
-  const items: DockItemData[] = [
-    { icon: <MagnifyingGlass weight="duotone" color="#ffd27a" />, label: 'Explore', onClick: () => nav('/explore'), active: at('/explore') || at('/resources') },
-    { icon: <MapTrifold weight="duotone" color="#5ab2ff" />, label: 'Campus map', onClick: () => nav('/map'), active: at('/map') },
-    { icon: <Ticket weight="duotone" color="#3ee6c1" />, label: 'My bookings', onClick: () => nav('/bookings'), active: at('/bookings') },
-    { icon: <QrCode weight="duotone" color="#f4efe6" />, label: 'Scan to check in', onClick: () => nav('/scan'), active: at('/scan') },
-  ]
-  if (user?.is_manager) {
-    items.push({ separator: true })
-    items.push({
-      icon: <Stamp weight="duotone" color="#ff6f59" />,
-      label: 'Approvals',
-      onClick: () => nav('/approvals'),
-      active: at('/approvals'),
-      badge: queue?.length ? String(queue.length) : undefined,
-    })
-    items.push({ icon: <ChartPieSlice weight="duotone" color="#8b7cff" />, label: 'Control room', onClick: () => nav('/admin'), active: at('/admin') })
-  }
-  items.push({ separator: true })
-  items.push({ icon: <UserCircle weight="duotone" color="#c9c4d6" />, label: 'Profile', onClick: () => nav('/me'), active: at('/me') })
+  const links = useMemo<NavEntry[]>(() => {
+    const base: NavEntry[] = [
+      { to: '/explore', label: 'Explore', icon: MagnifyingGlass },
+      { to: '/map', label: 'Map', icon: MapTrifold },
+      { to: '/bookings', label: 'Bookings', icon: Ticket },
+      { to: '/scan', label: 'Scan', icon: QrCode },
+    ]
+    if (user?.is_manager) {
+      base.push({ to: '/approvals', label: 'Approvals', icon: Stamp })
+      base.push({ to: '/admin', label: 'Control room', icon: ChartPieSlice })
+    }
+    return base
+  }, [user?.is_manager])
+
+  const isActive = (to: string) => pathname === to || pathname.startsWith(to + '/') || (to === '/explore' && pathname.startsWith('/resources'))
+  const pending = queue?.length ?? 0
+  const initials = user?.name.split(' ').map((p) => p[0]).slice(0, 2).join('')
 
   return (
     <>
@@ -190,23 +253,50 @@ export default function AppShell() {
       <Sparks />
       <header className="topbar glass">
         <Wordmark />
+        <nav className="nav-links" aria-label="Main">
+          {links.map((l) => (
+            <NavLink key={l.to} to={l.to} className={`nav-link ${isActive(l.to) ? 'on' : ''}`}>
+              {isActive(l.to) && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
+              <l.icon size={16} weight={isActive(l.to) ? 'fill' : 'regular'} />
+              <span>{l.label}</span>
+              {l.to === '/approvals' && pending > 0 && <em className="nav-count mono">{pending}</em>}
+            </NavLink>
+          ))}
+        </nav>
         <div className="grow" />
+        <button className="search-pill" onClick={() => setPalette(true)} aria-label="Search">
+          <MagnifyingGlass size={15} />
+          <span>Search</span>
+          <kbd>/</kbd>
+        </button>
+        <ThemeMenu />
         {user && (
           <>
             <Notifications />
-            <Link to="/me" className="user-chip hide-sm">
-              <span className="avatar">{user.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}</span>
-              <span style={{ lineHeight: 1.15 }}>
-                <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5 }}>{user.name}</span>
-                <span className="mono muted" style={{ fontSize: 10.5, letterSpacing: '.08em' }}>
-                  {user.role_label.toUpperCase()}
-                  {user.department_code ? ` · ${user.department_code}` : ''}
-                </span>
-              </span>
-            </Link>
-            <button className="key key-ghost key-icon" onClick={() => { logout(); nav('/') }} aria-label="Sign out" title="Sign out">
-              <SignOut size={18} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="user-chip" aria-label="Account">
+                  <span className="avatar sm">{initials}</span>
+                  <CaretDown size={12} weight="bold" className="hide-sm" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={10} className="pop-glass" style={{ minWidth: 230 }}>
+                <DropdownMenuLabel>
+                  <div style={{ fontWeight: 650 }}>{user.name}</div>
+                  <div className="mono muted" style={{ fontSize: 10.5, fontWeight: 400 }}>
+                    {user.role_label}
+                    {user.department_code ? ` · ${user.department_code}` : ''}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="menu-sep" />
+                <DropdownMenuItem className="select-item" onSelect={() => nav('/me')}>
+                  <UserCircle size={16} /> Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem className="select-item" onSelect={() => { logout(); nav('/') }}>
+                  <SignOut size={16} /> Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         )}
       </header>
@@ -222,17 +312,15 @@ export default function AppShell() {
       {user && (
         <>
           <CampusCopilot />
-          <div className="dock-host">
-            <Dock
-              items={items}
-              baseItemSize={46}
-              magnification={66}
-              panelHeight={62}
-              accentColor="#f5a524"
-              badgeColor="#ff6f59"
-              distance={170}
-            />
-          </div>
+          <CommandPalette open={palette} onOpenChange={setPalette} links={links} />
+          <nav className="tabbar glass" aria-label="Main (mobile)">
+            {[...links.slice(0, 4), user.is_manager ? links[5] : { to: '/me', label: 'Profile', icon: UserCircle }].map((l) => (
+              <NavLink key={l.to} to={l.to} className={`tab ${isActive(l.to) ? 'on' : ''}`}>
+                <l.icon size={21} weight={isActive(l.to) ? 'fill' : 'regular'} />
+                <span>{l.label === 'Control room' ? 'Admin' : l.label}</span>
+              </NavLink>
+            ))}
+          </nav>
         </>
       )}
     </>
