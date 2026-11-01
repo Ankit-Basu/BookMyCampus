@@ -254,6 +254,7 @@ const PrismaticBurst = ({
   lightMode = false
 }: PrismaticBurstProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const redrawRef = useRef<(() => void) | null>(null);
   const programRef = useRef<Program | null>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const mouseTargetRef = useRef<[number, number]>([0.5, 0.5]);
@@ -332,13 +333,12 @@ const PrismaticBurst = ({
     meshRef.current = mesh;
 
     // re-draws a still frame after a resize; assigned once the render loop exists
-    let kick: () => void = () => {};
     const resize = () => {
       const w = container.clientWidth || 1;
       const h = container.clientHeight || 1;
       renderer.setSize(w, h);
       program.uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
-      kick();
+      redrawRef.current?.();
     };
 
     let ro: ResizeObserver | null = null;
@@ -405,7 +405,7 @@ const PrismaticBurst = ({
       }
       raf = requestAnimationFrame(update);
     };
-    kick = () => {
+    redrawRef.current = () => {
       if (stillAt === undefined) return;
       framesLeft = 2;
       if (raf === 0) raf = requestAnimationFrame(update);
@@ -505,6 +505,7 @@ const PrismaticBurst = ({
       count = 0;
     }
     program.uniforms.uColorCount.value = count;
+    redrawRef.current?.();
   }, [intensity, speed, animationType, colors, distort, offset, rayCount, lightMode]);
 
   return <div className="prismatic-burst-container" ref={containerRef} />;
