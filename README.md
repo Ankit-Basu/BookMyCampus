@@ -168,6 +168,19 @@ frontend/src/
 docs/CONFLICT_PREVENTION.md
 ```
 
+### Design system
+
+Glassmorphism + bento with tactile (skeuomorphic) controls and a "campus box office" identity:
+split-flap departure board, tear-off tickets, rubber stamps, handwritten margin notes.
+
+* **Six themes, each with light and dark**, from [tweakcn](https://tweakcn.com) presets (`src/styles/themes.css`):
+  Solar Dusk, Cosmic Night, Northern Lights, Quantum Rose, Ocean Breeze, Elegant Luxury. Switching
+  recolours the UI and repaints the shader backdrop in a single frame.
+* **[shadcn/ui](https://ui.shadcn.com)** primitives (`src/components/shadcn`): dialogs, sheets, selects, popovers, menus and
+  the `/` command palette. **[React Bits](https://reactbits.dev)**: SplitFlapText, TearTicket, Grainient, PrismaticBurst,
+  BlurText, ShinyText, GlareHover, DecryptedText.
+* All colour derives from theme tokens (`src/styles/foundation.css`); nothing is hard-coded per page.
+
 ### Performance budget (why it feels smooth)
 
 * The app backdrop (React Bits Grainient) is rendered **once** as a still frame — glass panels
