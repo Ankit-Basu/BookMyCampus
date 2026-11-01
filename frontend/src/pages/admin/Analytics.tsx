@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 import { Reveal } from '../../components/motion'
-import { Meter, Skeleton } from '../../components/ui'
+import { Meter, Skeleton, Select } from '../../components/ui'
 import { api } from '../../lib/api'
 import { inr, pct, WEEKDAYS } from '../../lib/format'
 
@@ -38,8 +38,8 @@ type Util = {
   daily: { date: string; utilisation: number; used_hours: number }[]
 }
 
-const AXIS = { stroke: 'rgba(255,255,255,.35)', fontSize: 11, fontFamily: 'JetBrains Mono' }
-const GRID = 'rgba(255,255,255,.06)'
+const AXIS = { stroke: 'var(--fg-4)', fontSize: 11, fontFamily: 'Geist Mono' }
+const GRID = 'var(--line)'
 
 function ChartTip({ active, payload, label, fmt }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string; fmt?: (v: number) => string }) {
   if (!active || !payload?.length) return null
@@ -135,12 +135,12 @@ export default function Analytics() {
             <button key={d} className={days === d ? 'on' : ''} onClick={() => setDays(d)}>{d}d</button>
           ))}
         </div>
-        <select className="input" style={{ width: 'auto', height: 34, fontSize: 13 }} value={type} onChange={(e) => setType(e.target.value)}>
+        <Select style={{ width: 'auto', height: 34, fontSize: 13 }} value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">All resource types</option>
           {types?.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
-        </select>
+        </Select>
         <span className="mono muted" style={{ fontSize: 12, marginLeft: 'auto' }}>{range.from} → {range.to}</span>
       </div>
 
@@ -149,10 +149,10 @@ export default function Analytics() {
       ) : (
         <>
           <div className="kpi-grid four">
-            <div className="glass pad kpi"><div className="eyebrow">Utilisation</div><div className="stat-value" style={{ color: 'var(--amber-hi)' }}>{pct(u.totals.utilisation, 1)}</div></div>
+            <div className="glass pad kpi"><div className="eyebrow">Utilisation</div><div className="stat-value" style={{ color: 'var(--brand-ink)' }}>{pct(u.totals.utilisation, 1)}</div></div>
             <div className="glass pad kpi"><div className="eyebrow">Open hours (supply)</div><div className="stat-value">{Math.round(u.totals.supply_hours).toLocaleString()}</div></div>
             <div className="glass pad kpi"><div className="eyebrow">Used + taught hours</div><div className="stat-value">{Math.round(u.totals.used_hours + u.totals.teaching_hours).toLocaleString()}</div></div>
-            <div className="glass pad kpi"><div className="eyebrow">Idle asset value</div><div className="stat-value" style={{ color: 'var(--coral)' }}>{inr(u.totals.idle_value_inr)}</div></div>
+            <div className="glass pad kpi"><div className="eyebrow">Idle asset value</div><div className="stat-value" style={{ color: 'var(--bad)' }}>{inr(u.totals.idle_value_inr)}</div></div>
           </div>
 
           <Reveal className="glass pad">
@@ -163,15 +163,15 @@ export default function Analytics() {
                 <AreaChart data={u.daily.map((d) => ({ ...d, label: format(new Date(d.date), 'd MMM') }))} margin={{ left: -12, right: 8, top: 8 }}>
                   <defs>
                     <linearGradient id="ua" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stopColor="#f5a524" stopOpacity={0.45} />
-                      <stop offset="1" stopColor="#f5a524" stopOpacity={0} />
+                      <stop offset="0" stopColor="var(--brand)" stopOpacity={0.45} />
+                      <stop offset="1" stopColor="var(--brand)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke={GRID} vertical={false} />
                   <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} minTickGap={24} />
                   <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v) => `${Math.round(v * 100)}%`} width={48} />
-                  <Tooltip content={<ChartTip fmt={(v) => pct(v, 1)} />} cursor={{ stroke: 'rgba(255,255,255,.25)' }} />
-                  <Area type="monotone" dataKey="utilisation" stroke="#f5a524" strokeWidth={2} fill="url(#ua)" activeDot={{ r: 5, stroke: '#10132a', strokeWidth: 2 }} />
+                  <Tooltip content={<ChartTip fmt={(v) => pct(v, 1)} />} cursor={{ stroke: 'var(--line-2)' }} />
+                  <Area type="monotone" dataKey="utilisation" stroke="var(--brand)" strokeWidth={2} fill="url(#ua)" activeDot={{ r: 5, stroke: 'var(--background)', strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -212,8 +212,8 @@ export default function Analytics() {
                       </td>
                       <td><span className="tag" style={{ '--c': r.type_color } as CSSProperties}>{r.type}</span></td>
                       <td className="mono">{inr(r.value_inr)}</td>
-                      <td><div className="row" style={{ gap: 8 }}><div className="grow"><Meter value={r.utilisation} c1="#7a1f12" c2="#ff6f59" /></div><span className="mono" style={{ fontSize: 12, width: 40 }}>{pct(r.utilisation)}</span></div></td>
-                      <td className="mono" style={{ color: 'var(--coral)' }}>{inr(r.idle_value_inr)}</td>
+                      <td><div className="row" style={{ gap: 8 }}><div className="grow"><Meter value={r.utilisation} c2="var(--bad)" /></div><span className="mono" style={{ fontSize: 12, width: 40 }}>{pct(r.utilisation)}</span></div></td>
+                      <td className="mono" style={{ color: 'var(--bad)' }}>{inr(r.idle_value_inr)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -238,9 +238,9 @@ export default function Analytics() {
                 <BarChart data={demand} layout="vertical" margin={{ left: 20, right: 16 }}>
                   <CartesianGrid stroke={GRID} horizontal={false} />
                   <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-                  <YAxis type="category" dataKey="type" tick={{ ...AXIS, fill: '#c9c4d6' }} tickLine={false} axisLine={false} width={110} />
-                  <Tooltip content={<ChartTip fmt={(v) => `${pct(v, 1)} of requests clashed`} />} cursor={{ fill: 'rgba(255,255,255,.04)' }} />
-                  <Bar dataKey="pressure" fill="#f5a524" radius={[0, 4, 4, 0]} barSize={14} />
+                  <YAxis type="category" dataKey="type" tick={{ ...AXIS, fill: 'var(--fg-2)' }} tickLine={false} axisLine={false} width={110} />
+                  <Tooltip content={<ChartTip fmt={(v) => `${pct(v, 1)} of requests clashed`} />} cursor={{ fill: 'var(--wash)' }} />
+                  <Bar dataKey="pressure" fill="var(--brand)" radius={[0, 4, 4, 0]} barSize={14} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -254,7 +254,7 @@ export default function Analytics() {
         <Reveal className="glass pad">
           <div className="spread">
             <div className="h2">No-shows</div>
-            {ns && <span className="mono" style={{ color: 'var(--rose)' }}>{pct(ns.rate, 1)} overall</span>}
+            {ns && <span className="mono" style={{ color: 'var(--bad)' }}>{pct(ns.rate, 1)} overall</span>}
           </div>
           <div className="table-wrap" style={{ marginTop: 10 }}>
             <table className="table">
@@ -262,10 +262,10 @@ export default function Analytics() {
               <tbody>
                 {ns?.by_user.slice(0, 8).map((x: { user_id: number; name: string; total: number; noshows: number; rate: number; restricted_until: string | null }) => (
                   <tr key={x.user_id}>
-                    <td>{x.name} {x.restricted_until && new Date(x.restricted_until) > new Date() && <span className="tag" style={{ '--c': 'var(--coral)' } as CSSProperties}>paused</span>}</td>
+                    <td>{x.name} {x.restricted_until && new Date(x.restricted_until) > new Date() && <span className="tag" style={{ '--c': 'var(--bad)' } as CSSProperties}>paused</span>}</td>
                     <td className="mono">{x.total}</td>
                     <td className="mono">{x.noshows}</td>
-                    <td className="mono" style={{ color: x.rate > 0.15 ? 'var(--rose)' : undefined }}>{pct(x.rate)}</td>
+                    <td className="mono" style={{ color: x.rate > 0.15 ? 'var(--bad)' : undefined }}>{pct(x.rate)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -304,7 +304,7 @@ export default function Analytics() {
                     <td>{d.name}</td>
                     <td className="mono">{d.events}</td>
                     <td className="mono">{d.scheduled_hours}h</td>
-                    <td className="mono" style={{ color: d.breakdown_hours ? 'var(--coral)' : undefined }}>{d.breakdown_hours}h</td>
+                    <td className="mono" style={{ color: d.breakdown_hours ? 'var(--bad)' : undefined }}>{d.breakdown_hours}h</td>
                   </tr>
                 ))}
               </tbody>
@@ -320,7 +320,7 @@ export default function Analytics() {
                   <span>{q.department} <span className="muted">· {q.resource_type}</span></span>
                   <span className="mono">{q.used_hours}/{q.limit_hours}h</span>
                 </div>
-                <Meter value={q.share} c1={q.share > 0.9 ? '#7a1f12' : undefined} c2={q.share > 0.9 ? '#ff6f59' : undefined} />
+                <Meter value={q.share} c2={q.share > 0.9 ? 'var(--bad)' : undefined} />
               </div>
             ))}
           </div>

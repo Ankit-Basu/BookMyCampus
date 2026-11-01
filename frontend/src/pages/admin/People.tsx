@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { useDeferredValue, useState, type CSSProperties } from 'react'
 import { toast } from 'sonner'
 
-import { Drawer, Empty, Skeleton } from '../../components/ui'
+import { Drawer, Empty, Skeleton, Select } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { isPolicyAdmin, useAuth } from '../../lib/auth'
 import { fmtRelative, ROLE_LABEL } from '../../lib/format'
@@ -32,13 +32,13 @@ type Person = {
 type Dept = { id: number; code: string; name: string }
 
 const ROLE_COLOR: Record<string, string> = {
-  student: 'var(--sky)',
-  faculty: 'var(--mint)',
-  staff: 'var(--violet)',
-  custodian: 'var(--amber)',
-  dept_head: 'var(--coral)',
-  facility_manager: 'var(--rose)',
-  admin: '#ffd27a',
+  student: 'var(--info)',
+  faculty: 'var(--ok)',
+  staff: 'var(--chart-4)',
+  custodian: 'var(--brand)',
+  dept_head: 'var(--bad)',
+  facility_manager: 'var(--bad)',
+  admin: 'var(--brand)',
 }
 
 function Editor({ person, depts, onClose }: { person: Person | 'new' | null; depts: Dept[]; onClose: () => void }) {
@@ -94,16 +94,16 @@ function Editor({ person, depts, onClose }: { person: Person | 'new' | null; dep
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label className="field">
               <span>Role · what they can do</span>
-              <select name="role" className="input" defaultValue={p?.role ?? 'student'}>
+              <Select name="role" defaultValue={p?.role ?? 'student'}>
                 {Object.entries(ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
+              </Select>
             </label>
             <label className="field">
               <span>Department</span>
-              <select name="department" className="input" defaultValue={p?.department ?? ''}>
+              <Select name="department" defaultValue={p?.department ?? ''}>
                 <option value="">—</option>
                 {depts.map((d) => <option key={d.id} value={d.id}>{d.code} · {d.name}</option>)}
-              </select>
+              </Select>
             </label>
           </div>
           <label className="field">
@@ -111,11 +111,11 @@ function Editor({ person, depts, onClose }: { person: Person | 'new' | null; dep
             <input name="password" type="password" className="input" autoComplete="new-password" minLength={8} />
           </label>
           <label className="row" style={{ gap: 10, marginTop: 4 }}>
-            <input type="checkbox" name="is_active" defaultChecked={p?.is_active ?? true} style={{ width: 18, height: 18, accentColor: 'var(--amber)' }} />
+            <input type="checkbox" name="is_active" defaultChecked={p?.is_active ?? true} style={{ width: 18, height: 18, accentColor: 'var(--brand)' }} />
             <span>Account active (inactive users can’t sign in)</span>
           </label>
           {p?.is_restricted && (
-            <div className="notice"><ShieldWarning size={18} color="var(--coral)" /> Booking paused until {format(new Date(p.restricted_until!), 'd MMM')} — {p.restriction_reason}. Lift it from the No-show monitor.</div>
+            <div className="notice"><ShieldWarning size={18} color="var(--bad)" /> Booking paused until {format(new Date(p.restricted_until!), 'd MMM')} — {p.restriction_reason}. Lift it from the No-show monitor.</div>
           )}
           <button className="key key-amber key-lg" disabled={save.isPending}>{isNew ? 'Create account' : 'Save changes'}</button>
         </form>
@@ -151,19 +151,19 @@ export default function People() {
           <MagnifyingGlass size={16} className="muted" />
           <input className="input" style={{ height: 36 }} placeholder="Search name, UMS ID or email…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className="input" style={{ width: 'auto', height: 36 }} value={role} onChange={(e) => setRole(e.target.value)}>
+        <Select style={{ width: 'auto', height: 36 }} value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="">All roles</option>
           {Object.entries(ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select className="input" style={{ width: 'auto', height: 36 }} value={dept} onChange={(e) => setDept(e.target.value)}>
+        </Select>
+        <Select style={{ width: 'auto', height: 36 }} value={dept} onChange={(e) => setDept(e.target.value)}>
           <option value="">All departments</option>
           {depts.map((d) => <option key={d.id} value={d.id}>{d.code}</option>)}
-        </select>
-        <select className="input" style={{ width: 'auto', height: 36 }} value={active} onChange={(e) => setActive(e.target.value)}>
+        </Select>
+        <Select style={{ width: 'auto', height: 36 }} value={active} onChange={(e) => setActive(e.target.value)}>
           <option value="">Active + inactive</option>
           <option value="true">Active</option>
           <option value="false">Deactivated</option>
-        </select>
+        </Select>
         {admin && (
           <button className="key key-amber key-sm" onClick={() => setEdit('new')}><UserPlus weight="bold" /> New account</button>
         )}
@@ -187,7 +187,7 @@ export default function People() {
                   <tr key={p.id} style={{ opacity: p.is_active ? 1 : 0.5 }}>
                     <td>
                       <div className="row" style={{ gap: 10 }}>
-                        <span className="avatar sm" style={{ background: `linear-gradient(145deg, ${ROLE_COLOR[p.role]}, #222)` }}>{p.name.split(' ').map((x) => x[0]).slice(0, 2).join('')}</span>
+                        <span className="avatar sm" style={{ background: `color-mix(in oklab, ${ROLE_COLOR[p.role]} 80%, black)` }}>{p.name.split(' ').map((x) => x[0]).slice(0, 2).join('')}</span>
                         <span style={{ minWidth: 0 }}>
                           <span style={{ display: 'block', fontWeight: 600 }}>{p.name}</span>
                           <span className="mono muted" style={{ fontSize: 11 }}>{p.username}{p.email ? ` · ${p.email}` : ''}</span>
@@ -197,9 +197,9 @@ export default function People() {
                     <td><span className="tag" style={{ '--c': ROLE_COLOR[p.role] } as CSSProperties}>{p.role_label}</span></td>
                     <td className="mono">{p.department_code ?? '—'}</td>
                     <td className="mono">{p.booking_count}</td>
-                    <td className="mono" style={{ color: p.noshows_30d >= 3 ? 'var(--rose)' : undefined }}>{p.noshows_30d}</td>
+                    <td className="mono" style={{ color: p.noshows_30d >= 3 ? 'var(--bad)' : undefined }}>{p.noshows_30d}</td>
                     <td>
-                      {!p.is_active ? <span className="muted">Deactivated</span> : p.is_restricted ? <span className="tag" style={{ '--c': 'var(--coral)' } as CSSProperties}>Paused</span> : <span className="tag" style={{ '--c': 'var(--mint)' } as CSSProperties}>Active</span>}
+                      {!p.is_active ? <span className="muted">Deactivated</span> : p.is_restricted ? <span className="tag" style={{ '--c': 'var(--bad)' } as CSSProperties}>Paused</span> : <span className="tag" style={{ '--c': 'var(--ok)' } as CSSProperties}>Active</span>}
                     </td>
                     <td>
                       {admin && (

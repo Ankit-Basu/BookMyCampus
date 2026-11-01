@@ -97,7 +97,7 @@ function SystemHealth() {
     <div className="health-strip">
       {items.map((i) => (
         <div key={i.label} className="health-item">
-          <span className={`led ${i.ok ? 'pulse' : ''}`} style={{ '--c': i.ok ? 'var(--mint)' : i.warn ? 'var(--amber)' : 'var(--coral)' } as CSSProperties} />
+          <span className={`led ${i.ok ? 'pulse' : ''}`} style={{ '--c': i.ok ? 'var(--ok)' : i.warn ? 'var(--brand)' : 'var(--bad)' } as CSSProperties} />
           <span>
             <span className="eyebrow" style={{ display: 'block' }}>{i.label}</span>
             <span style={{ fontSize: 13 }}>{i.value}</span>
@@ -118,12 +118,12 @@ function Overview() {
   const kpis: { l: string; v: number; c?: string; to?: string }[] = data
     ? [
         { l: 'Bookings today', v: data.bookings_today },
-        { l: 'Checked in right now', v: data.live_now, c: 'var(--mint)' },
-        { l: 'Awaiting approval', v: data.pending_approvals, c: 'var(--amber)', to: '/approvals' },
-        { l: 'No-shows this week', v: data.noshows_week, c: 'var(--rose)', to: '/admin/operations/noshows' },
-        { l: 'Users restricted', v: data.restricted_users, c: 'var(--coral)', to: '/admin/operations/noshows' },
-        { l: 'Out of service', v: data.down, c: 'var(--violet)', to: '/admin/operations/maintenance' },
-        { l: 'Low-stock items', v: data.low_stock, c: 'var(--amber)', to: '/admin/operations/consumables' },
+        { l: 'Checked in right now', v: data.live_now, c: 'var(--ok)' },
+        { l: 'Awaiting approval', v: data.pending_approvals, c: 'var(--brand)', to: '/approvals' },
+        { l: 'No-shows this week', v: data.noshows_week, c: 'var(--bad)', to: '/admin/operations/noshows' },
+        { l: 'Users restricted', v: data.restricted_users, c: 'var(--bad)', to: '/admin/operations/noshows' },
+        { l: 'Out of service', v: data.down, c: 'var(--chart-4)', to: '/admin/operations/maintenance' },
+        { l: 'Low-stock items', v: data.low_stock, c: 'var(--brand)', to: '/admin/operations/consumables' },
         { l: 'Bookable resources', v: data.resources },
       ]
     : []

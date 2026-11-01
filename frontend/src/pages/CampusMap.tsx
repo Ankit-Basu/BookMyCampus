@@ -107,9 +107,9 @@ export default function CampusMap() {
                       </div>
                     </div>
                     {freeIds.has(r.id) ? (
-                      <span className="tag" style={{ '--c': 'var(--mint)' } as CSSProperties}>Free now</span>
+                      <span className="tag" style={{ '--c': 'var(--ok)' } as CSSProperties}>Free now</span>
                     ) : (
-                      <span className="tag" style={{ '--c': 'var(--coral)' } as CSSProperties}>Busy</span>
+                      <span className="tag" style={{ '--c': 'var(--bad)' } as CSSProperties}>Busy</span>
                     )}
                   </Link>
                 ))}
@@ -128,7 +128,7 @@ export default function CampusMap() {
                       setFly([b.lat, b.lng])
                     }}
                   >
-                    <Buildings size={18} weight="duotone" color="var(--amber)" />
+                    <Buildings size={18} weight="duotone" color="var(--brand)" />
                     <span className="grow" style={{ textAlign: 'left' }}>{b.name}</span>
                     <span className="mono muted" style={{ fontSize: 12 }}>
                       {b.resources.filter((r) => freeIds.has(r.id)).length}/{b.resources.length} free

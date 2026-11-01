@@ -23,7 +23,7 @@ import { toast } from 'sonner'
 
 import { Reveal } from '../components/motion'
 import DecryptedText from '../components/reactbits/DecryptedText'
-import { Drawer, Modal, Skeleton, TypeTag } from '../components/ui'
+import { Drawer, Modal, Skeleton, TypeTag, Select } from '../components/ui'
 import { api, blobUrl, errorCode, errorDetails, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { durationLabel, inr, WEEKDAYS } from '../lib/format'
@@ -123,7 +123,7 @@ function BookingDrawer({
           {result.skipped.length > 0 && (
             <div className="glass-flat pad" style={{ borderColor: 'rgba(255,111,89,.35)' }}>
               <div className="row" style={{ marginBottom: 8 }}>
-                <Warning color="var(--coral)" /> <strong>Skipped — clashes handled per date</strong>
+                <Warning color="var(--bad)" /> <strong>Skipped — clashes handled per date</strong>
               </div>
               {result.skipped.map((s) => (
                 <div key={s.start} className="spread" style={{ fontSize: 13, padding: '4px 0' }}>
@@ -150,7 +150,7 @@ function BookingDrawer({
               <div className="display" style={{ fontSize: 30 }}>{format(slot.start, 'd MMMM')}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div className="mono" style={{ fontSize: 22, color: 'var(--amber-hi)' }}>
+              <div className="mono" style={{ fontSize: 22, color: 'var(--brand-ink)' }}>
                 {format(slot.start, 'HH:mm')}–{format(slot.end, 'HH:mm')}
               </div>
               <div className="eyebrow">{durationLabel(slot.start.toISOString(), slot.end.toISOString())}</div>
@@ -158,7 +158,7 @@ function BookingDrawer({
           </div>
           {resource.requires_approval && (
             <div className="notice">
-              <Stamp size={18} color="var(--amber)" /> This needs approval. The slot is held for you the moment you submit.
+              <Stamp size={18} color="var(--brand)" /> This needs approval. The slot is held for you the moment you submit.
             </div>
           )}
           <label className="field">
@@ -205,7 +205,7 @@ function BookingDrawer({
             <div className="glass-flat pad" style={{ padding: 16 }}>
               <div className="spread">
                 <div className="row" style={{ gap: 10 }}>
-                  <Repeat size={18} color="var(--sky)" />
+                  <Repeat size={18} color="var(--info)" />
                   <div>
                     <div className="h3">Repeat weekly</div>
                     <div className="muted" style={{ fontSize: 12 }}>Each date is claimed independently</div>
@@ -229,10 +229,10 @@ function BookingDrawer({
                     </label>
                     <label className="field">
                       <span>If a date clashes</span>
-                      <select className="input" value={policy} onChange={(e) => setPolicy(e.target.value as 'skip' | 'abort')}>
+                      <Select value={policy} onChange={(e) => setPolicy(e.target.value as 'skip' | 'abort')}>
                         <option value="skip">Skip that date, book the rest</option>
                         <option value="abort">Book nothing (all or nothing)</option>
-                      </select>
+                      </Select>
                     </label>
                   </div>
                 </div>
@@ -280,7 +280,7 @@ export default function ResourcePage() {
       id: `b${i}`,
       start: b.start,
       end: b.end,
-      title: b.kind === 'timetable' ? `🎓 ${b.label}` : b.kind === 'maintenance' ? `🔧 ${b.label}` : b.mine ? `★ ${b.label}` : b.label,
+      title: b.kind === 'timetable' ? `${b.label}` : b.kind === 'maintenance' ? `${b.label}` : b.mine ? `${b.label}` : b.label,
       classNames: [`ev-${b.kind}`, b.mine ? 'ev-mine' : '', b.status === 'pending' ? 'ev-pending' : ''],
       overlap: false,
       editable: false,
@@ -370,11 +370,11 @@ export default function ResourcePage() {
             <div className="row wrap" style={{ gap: 8 }}>
               <TypeTag name={r.type_name} color={r.type_color} icon={r.type_icon} />
               {r.status === 'down' ? (
-                <span className="tag" style={{ '--c': 'var(--coral)' } as CSSProperties}><Wrench size={12} /> Out of service</span>
+                <span className="tag" style={{ '--c': 'var(--bad)' } as CSSProperties}><Wrench size={12} /> Out of service</span>
               ) : r.requires_approval ? (
-                <span className="tag" style={{ '--c': 'var(--amber)' } as CSSProperties}><Stamp size={12} /> Approval required</span>
+                <span className="tag" style={{ '--c': 'var(--brand)' } as CSSProperties}><Stamp size={12} /> Approval required</span>
               ) : (
-                <span className="tag" style={{ '--c': 'var(--mint)' } as CSSProperties}><SealCheck size={12} /> Instant booking</span>
+                <span className="tag" style={{ '--c': 'var(--ok)' } as CSSProperties}><SealCheck size={12} /> Instant booking</span>
               )}
             </div>
             <h1 className="display" style={{ fontSize: 'clamp(40px,5.5vw,76px)', margin: '12px 0 6px' }}>{r.name}</h1>
@@ -415,7 +415,7 @@ export default function ResourcePage() {
 
       {!!windows?.length && (
         <div className="maint-banner glass">
-          <Wrench size={22} weight="duotone" color="var(--coral)" />
+          <Wrench size={22} weight="duotone" color="var(--bad)" />
           <div className="grow" style={{ minWidth: 0 }}>
             {windows.map((w) => (
               <div key={w.id} className="spread" style={{ gap: 10, flexWrap: 'wrap', padding: '4px 0' }}>
@@ -450,7 +450,7 @@ export default function ResourcePage() {
               <span><i className="lg-timetable" /> Class</span>
               <span><i className="lg-maint" /> Maintenance</span>
               <span><i className="lg-mine" /> Yours</span>
-              {isFetching && <span className="led pulse" style={{ '--c': 'var(--amber)' } as CSSProperties} />}
+              {isFetching && <span className="led pulse" style={{ '--c': 'var(--brand)' } as CSSProperties} />}
             </div>
           </div>
           <div className="fc-shell" data-lenis-prevent>
@@ -495,7 +495,7 @@ export default function ResourcePage() {
         <aside className="col" style={{ gap: 18 }}>
           <Reveal className="glass pad">
             <div className="eyebrow" style={{ marginBottom: 10 }}>About</div>
-            <p style={{ margin: '0 0 14px', color: 'var(--paper-dim)' }}>{r.description}</p>
+            <p style={{ margin: '0 0 14px', color: 'var(--fg-2)' }}>{r.description}</p>
             {r.attributes.length > 0 && (
               <dl className="attrs">
                 {r.attributes.map((a) => (

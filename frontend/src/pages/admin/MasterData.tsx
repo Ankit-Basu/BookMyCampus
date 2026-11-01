@@ -5,7 +5,7 @@ import { useState, type CSSProperties } from 'react'
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
 import { toast } from 'sonner'
 
-import { Drawer, ICON_KEYS, TypeIcon } from '../../components/ui'
+import { Drawer, ICON_KEYS, TypeIcon, Select } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { isPolicyAdmin, useAuth } from '../../lib/auth'
 import { ROLE_LABEL } from '../../lib/format'
@@ -157,10 +157,10 @@ function Locations() {
           <tbody>
             {list.data?.map((l) => (
               <tr key={l.id}>
-                <td><Buildings size={14} color="var(--amber)" /> {l.building}</td>
+                <td><Buildings size={14} color="var(--brand)" /> {l.building}</td>
                 <td className="mono">{l.floor || '—'}</td>
                 <td className="mono">{l.room || '—'}</td>
-                <td className="mono muted" style={{ fontSize: 12 }}>{l.latitude ? `${Number(l.latitude).toFixed(4)}, ${Number(l.longitude).toFixed(4)}` : <span style={{ color: 'var(--coral)' }}>not placed</span>}</td>
+                <td className="mono muted" style={{ fontSize: 12 }}>{l.latitude ? `${Number(l.latitude).toFixed(4)}, ${Number(l.longitude).toFixed(4)}` : <span style={{ color: 'var(--bad)' }}>not placed</span>}</td>
                 <td><button className="key key-ghost key-sm key-icon" onClick={() => setDraft(l)}><PencilSimple size={15} /></button></td>
               </tr>
             ))}
@@ -222,11 +222,11 @@ function Departments({ canEdit }: { canEdit: boolean }) {
       </div>
       <div className="md-grid">
         {list.data?.map((d) => (
-          <div key={d.id} className="md-card" style={{ '--c': 'var(--violet)' } as CSSProperties}>
+          <div key={d.id} className="md-card" style={{ '--c': 'var(--chart-4)' } as CSSProperties}>
             <div className="md-icon mono" style={{ fontSize: 13, fontWeight: 700 }}>{d.code}</div>
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="h3 truncate">{d.name}</div>
-              <div className="muted truncate" style={{ fontSize: 12 }}>Head: {d.head_name || <span style={{ color: 'var(--coral)' }}>not assigned</span>}</div>
+              <div className="muted truncate" style={{ fontSize: 12 }}>Head: {d.head_name || <span style={{ color: 'var(--bad)' }}>not assigned</span>}</div>
             </div>
             {canEdit && <button className="key key-ghost key-sm key-icon" onClick={() => setDraft(d)}><PencilSimple size={15} /></button>}
           </div>
@@ -241,12 +241,12 @@ function Departments({ canEdit }: { canEdit: boolean }) {
             </div>
             <label className="field">
               <span>Head of department</span>
-              <select className="input" value={draft.head ?? ''} onChange={(e) => setDraft({ ...draft, head: e.target.value ? Number(e.target.value) : null })}>
+              <Select value={draft.head ?? ''} onChange={(e) => setDraft({ ...draft, head: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">— not assigned —</option>
                 {people?.filter((p) => ['dept_head', 'faculty', 'facility_manager', 'admin'].includes(p.role)).map((p) => (
                   <option key={p.id} value={p.id}>{p.name} · {ROLE_LABEL[p.role]}</option>
                 ))}
-              </select>
+              </Select>
             </label>
             <div className="row">
               {draft.id && (

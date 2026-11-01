@@ -5,11 +5,12 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { Wordmark } from '../components/AppShell'
+import { ThemeMenu, Wordmark } from '../components/AppShell'
 import Grainient from '../components/reactbits/bg/Grainient'
 import { Sparks } from '../components/Backdrop'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { useTheme } from '../lib/theme'
 import { ROLE_LABEL } from '../lib/format'
 
 type Demo = { username: string; name: string; role: string; role_label: string; password: string }
@@ -26,6 +27,7 @@ const ROLE_BLURB: Record<string, string> = {
 
 export default function Login() {
   const { user, login } = useAuth()
+  const { palette } = useTheme()
   const nav = useNavigate()
   const [params] = useSearchParams()
   const next = params.get('next') || '/explore'
@@ -57,9 +59,9 @@ export default function Login() {
     <div className="login">
       <div className="login-bg">
         <Grainient
-          color1="#ff9a2e"
-          color2="#6a3dff"
-          color3="#0a0b16"
+          color1={palette.shader[0]}
+          color2={palette.shader[1]}
+          color3={palette.shader[2]}
           timeSpeed={0.18}
           warpAmplitude={70}
           blendSoftness={0.18}
@@ -75,16 +77,17 @@ export default function Login() {
       <Sparks />
       <div className="login-top">
         <Wordmark />
+        <ThemeMenu />
       </div>
       <div className="login-grid">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}>
           <div className="eyebrow">Sign in</div>
-          <h1 className="display" style={{ fontSize: 'clamp(46px,6vw,84px)', margin: '8px 0 14px' }}>
+          <h1 className="display" style={{ fontSize: 'clamp(46px,6.4vw,92px)', fontWeight: 800, margin: '8px 0 14px' }}>
             Your campus,
             <br />
             <em>on reservation.</em>
           </h1>
-          <p className="muted" style={{ maxWidth: 440 }}>
+          <p style={{ maxWidth: 440, color: 'var(--fg-2)' }}>
             Use your UMS registration or employee ID. Demo personas below sign you in instantly — try the student first, then a custodian to approve what they asked for.
           </p>
         </motion.div>

@@ -49,11 +49,11 @@ function ApprovalCard({ item }: { item: QueueItem }) {
             <div className="eyebrow">{item.resource_type} · {item.reference}</div>
             <Link to={`/resources/${item.resource}`} className="h2" style={{ display: 'block', marginTop: 4 }}>{item.resource_name}</Link>
           </div>
-          <span className="tag" style={{ '--c': 'var(--amber)' } as CSSProperties}>
+          <span className="tag" style={{ '--c': 'var(--brand)' } as CSSProperties}>
             <Stamp size={12} /> Step {step + 1}/{item.approvals.length} · {item.current_step.name}
           </span>
         </div>
-        <div className="mono" style={{ marginTop: 10, color: 'var(--amber-hi)' }}>
+        <div className="mono" style={{ marginTop: 10, color: 'var(--brand-ink)' }}>
           {fmtRange(item.start, item.end)} <span className="muted">· {durationLabel(item.start, item.end)}</span>
         </div>
         <div style={{ marginTop: 8, fontWeight: 600 }}>“{item.title}”</div>

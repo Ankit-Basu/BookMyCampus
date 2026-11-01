@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { useState, type CSSProperties } from 'react'
 import { toast } from 'sonner'
 
-import { Drawer } from '../../components/ui'
+import { Drawer, Select } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { isPolicyAdmin, useAuth } from '../../lib/auth'
 import { ROLE_LABEL, WEEKDAYS } from '../../lib/format'
@@ -98,7 +98,7 @@ function WorkflowBuilder({ types }: { types: Type[] }) {
             <label className="field"><span>Name</span><input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
             <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: 12 }}>
               <label className="field"><span>Resource type</span>
-                <select className="input" value={draft.resource_type} onChange={(e) => setDraft({ ...draft, resource_type: Number(e.target.value) })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                <Select value={draft.resource_type} onChange={(e) => setDraft({ ...draft, resource_type: Number(e.target.value) })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>
               </label>
               <label className="field"><span>Priority</span><input className="input" type="number" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })} /></label>
             </div>
@@ -119,9 +119,9 @@ function WorkflowBuilder({ types }: { types: Type[] }) {
                   <div key={i} className="step-edit">
                     <span className="mono step-n">{i + 1}</span>
                     <input className="input" value={s.name} onChange={(e) => setDraft({ ...draft, steps: draft.steps.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
-                    <select className="input" value={s.approver_role} onChange={(e) => setDraft({ ...draft, steps: draft.steps.map((x, j) => (j === i ? { ...x, approver_role: e.target.value } : x)) })}>
+                    <Select value={s.approver_role} onChange={(e) => setDraft({ ...draft, steps: draft.steps.map((x, j) => (j === i ? { ...x, approver_role: e.target.value } : x)) })}>
                       {APPROVER_ROLES.map((r) => <option key={r.v} value={r.v}>{r.l}</option>)}
-                    </select>
+                    </Select>
                     <div className="row" style={{ gap: 4 }}>
                       <button type="button" className="key key-ghost key-sm key-icon" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={14} /></button>
                       <button type="button" className="key key-ghost key-sm key-icon" disabled={i === draft.steps.length - 1} onClick={() => move(i, 1)}><ArrowDown size={14} /></button>
@@ -189,7 +189,7 @@ function Rules({ types }: { types: Type[] }) {
           <div className="col" style={{ gap: 12 }}>
             {!edit.id && (
               <label className="field"><span>Resource type</span>
-                <select className="input" value={edit.resource_type ?? ''} onChange={(e) => setEdit({ ...edit, resource_type: Number(e.target.value) })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                <Select value={edit.resource_type ?? ''} onChange={(e) => setEdit({ ...edit, resource_type: Number(e.target.value) })}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>
               </label>
             )}
             <label className="field"><span>Name</span><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
@@ -235,10 +235,10 @@ function Blackouts({ types }: { types: Type[] }) {
         <input className="input" placeholder="e.g. Diwali break" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required />
         <input className="input" type="datetime-local" value={f.start_at} onChange={(e) => setF({ ...f, start_at: e.target.value })} required />
         <input className="input" type="datetime-local" value={f.end_at} onChange={(e) => setF({ ...f, end_at: e.target.value })} required />
-        <select className="input" value={f.resource_type} onChange={(e) => setF({ ...f, resource_type: e.target.value })}>
+        <Select value={f.resource_type} onChange={(e) => setF({ ...f, resource_type: e.target.value })}>
           <option value="">Entire campus</option>
           {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        </Select>
         <button className="key key-amber"><Plus weight="bold" /> Add</button>
       </form>
       <div className="col" style={{ gap: 8, marginTop: 14 }}>
@@ -278,19 +278,19 @@ function Quotas({ types }: { types: Type[] }) {
             {list.data?.map((q) => (
               <tr key={q.id}>
                 <td>
-                  <select className="input" style={{ height: 34, fontSize: 13 }} value={q.department ?? ''} onChange={(e) => update.mutate({ id: q.id, department: e.target.value ? Number(e.target.value) : null })}>
+                  <Select style={{ height: 34, fontSize: 13 }} value={q.department ?? ''} onChange={(e) => update.mutate({ id: q.id, department: e.target.value ? Number(e.target.value) : null })}>
                     <option value="">All</option>{depts?.map((d) => <option key={d.id} value={d.id}>{d.code}</option>)}
-                  </select>
+                  </Select>
                 </td>
                 <td>
-                  <select className="input" style={{ height: 34, fontSize: 13 }} value={q.role} onChange={(e) => update.mutate({ id: q.id, role: e.target.value })}>
+                  <Select style={{ height: 34, fontSize: 13 }} value={q.role} onChange={(e) => update.mutate({ id: q.id, role: e.target.value })}>
                     <option value="">All roles</option>{REQUESTER_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                  </select>
+                  </Select>
                 </td>
                 <td>
-                  <select className="input" style={{ height: 34, fontSize: 13 }} value={q.resource_type ?? ''} onChange={(e) => update.mutate({ id: q.id, resource_type: e.target.value ? Number(e.target.value) : null })}>
+                  <Select style={{ height: 34, fontSize: 13 }} value={q.resource_type ?? ''} onChange={(e) => update.mutate({ id: q.id, resource_type: e.target.value ? Number(e.target.value) : null })}>
                     <option value="">All types</option>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  </Select>
                 </td>
                 <td>{num(q, 'department_hours_per_week')}</td>
                 <td>{num(q, 'user_hours_per_week')}</td>

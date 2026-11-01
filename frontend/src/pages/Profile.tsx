@@ -23,9 +23,9 @@ export default function Profile() {
   const feed = `${window.location.origin}/api/calendar/${user.calendar_token}.ics`
   const ladder = policy
     ? [
-        { n: policy.strike_warn, label: 'Warning', c: 'var(--amber)' },
-        { n: policy.strike_level1, label: `${policy.restrict_days_level1}-day pause`, c: 'var(--coral)' },
-        { n: policy.strike_level2, label: `${policy.restrict_days_level2}-day pause`, c: 'var(--rose)' },
+        { n: policy.strike_warn, label: 'Warning', c: 'var(--brand)' },
+        { n: policy.strike_level1, label: `${policy.restrict_days_level1}-day pause`, c: 'var(--bad)' },
+        { n: policy.strike_level2, label: `${policy.restrict_days_level2}-day pause`, c: 'var(--bad)' },
       ]
     : []
 
@@ -35,7 +35,7 @@ export default function Profile() {
 
       {user.is_restricted && (
         <div className="glass pad notice-bad" style={{ marginBottom: 18 }}>
-          <ShieldWarning size={28} weight="duotone" color="var(--coral)" />
+          <ShieldWarning size={28} weight="duotone" color="var(--bad)" />
           <div>
             <div className="h2">Booking paused until {format(new Date(user.restricted_until!), 'EEE d MMM, HH:mm')}</div>
             <div className="muted">{user.restriction_reason}. Talk to a facility manager if this was a mistake.</div>
@@ -45,7 +45,7 @@ export default function Profile() {
 
       <div className="profile-grid">
         <Reveal className="glass pad" style={{ display: 'grid', placeItems: 'center' }}>
-          <Dial value={reliability} label="Show-up rate" color={reliability > 0.85 ? 'var(--mint)' : reliability > 0.6 ? 'var(--amber)' : 'var(--coral)'} size={200} />
+          <Dial value={reliability} label="Show-up rate" color={reliability > 0.85 ? 'var(--ok)' : reliability > 0.6 ? 'var(--brand)' : 'var(--bad)'} size={200} />
           <div className="muted" style={{ fontSize: 13 }}>{shows} of {done.length} check-in bookings attended</div>
         </Reveal>
         <Reveal className="glass pad">

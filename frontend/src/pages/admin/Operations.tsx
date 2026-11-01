@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { useState, type CSSProperties } from 'react'
 import { toast } from 'sonner'
 
-import { Drawer, Meter, Modal, StatusTag } from '../../components/ui'
+import { Drawer, Meter, Modal, StatusTag, Select } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { isPolicyAdmin, useAuth } from '../../lib/auth'
 import { fmtRelative, WEEKDAYS } from '../../lib/format'
@@ -35,10 +35,10 @@ function Maintenance() {
         <div className="h2" style={{ marginBottom: 4 }}>Schedule maintenance</div>
         <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>The window is written into the booking ledger; overlapping bookings are displaced and their owners told.</div>
         <div className="maint-form">
-          <select className="input" value={f.resource} onChange={(e) => setF({ ...f, resource: e.target.value })} required>
+          <Select value={f.resource} onChange={(e) => setF({ ...f, resource: e.target.value })} required>
             <option value="">Resource…</option>
             {resources?.map((r) => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
-          </select>
+          </Select>
           <input className="input" placeholder="What’s being done" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} required />
           <input className="input" type="datetime-local" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} required />
           <input className="input" type="datetime-local" value={f.end} onChange={(e) => setF({ ...f, end: e.target.value })} required />
@@ -55,7 +55,7 @@ function Maintenance() {
                   <td><strong>{m.resource_name}</strong><div className="mono muted" style={{ fontSize: 11 }}>{m.resource_code}</div></td>
                   <td>{m.title}<div className="muted" style={{ fontSize: 12 }}>{m.reported_by_name}</div></td>
                   <td className="mono" style={{ fontSize: 12 }}>{format(new Date(m.start), 'd MMM HH:mm')} → {format(new Date(m.end), 'd MMM HH:mm')}</td>
-                  <td><span className="tag" style={{ '--c': m.kind === 'breakdown' ? 'var(--coral)' : 'var(--sky)' } as CSSProperties}>{m.kind}</span></td>
+                  <td><span className="tag" style={{ '--c': m.kind === 'breakdown' ? 'var(--bad)' : 'var(--info)' } as CSSProperties}>{m.kind}</span></td>
                   <td><StatusTag status={m.status === 'done' ? 'completed' : m.status === 'in_progress' ? 'checked_in' : m.status === 'cancelled' ? 'cancelled' : 'confirmed'} label={m.status.replace('_', ' ')} /></td>
                   <td className="mono">{m.displaced_bookings}</td>
                   <td>
@@ -136,16 +136,16 @@ function ItemEditor({ item, onClose }: { item: Item | null; onClose: () => void 
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label className="field">
               <span>Kind</span>
-              <select name="kind" className="input" defaultValue={item.kind}>
+              <Select name="kind" defaultValue={item.kind}>
                 <option value="consumable">Consumable — used up</option>
                 <option value="accessory">Accessory — returned</option>
-              </select>
+              </Select>
             </label>
             <label className="field"><span>Unit</span><input name="unit" className="input" defaultValue={item.unit} placeholder="pcs, boxes, ml" /></label>
           </div>
           <label className="field">
             <span>Issued with</span>
-            <select name="link" className="input" defaultValue={item.resource ? `r:${item.resource}` : item.resource_type ? `t:${item.resource_type}` : ''}>
+            <Select name="link" defaultValue={item.resource ? `r:${item.resource}` : item.resource_type ? `t:${item.resource_type}` : ''}>
               <option value="">Anything (general stock)</option>
               <optgroup label="Every resource of a type">
                 {types?.map((t) => <option key={t.id} value={`t:${t.id}`}>{t.name}</option>)}
@@ -153,7 +153,7 @@ function ItemEditor({ item, onClose }: { item: Item | null; onClose: () => void 
               <optgroup label="One specific resource">
                 {resources?.map((r) => <option key={r.id} value={`r:${r.id}`}>{r.code} — {r.name}</option>)}
               </optgroup>
-            </select>
+            </Select>
           </label>
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <label className="field"><span>In stock</span><input name="stock" type="number" min={0} className="input mono" defaultValue={item.stock} /></label>
@@ -198,14 +198,14 @@ function Consumables() {
                 <div className="h3 truncate">{c.name}</div>
                 <div className="muted truncate" style={{ fontSize: 12 }}>{c.resource_name ?? c.resource_type_name ?? 'General'} · {c.kind}</div>
               </div>
-              {c.is_low && <span className="tag" style={{ '--c': 'var(--coral)' } as CSSProperties}>Low</span>}
+              {c.is_low && <span className="tag" style={{ '--c': 'var(--bad)' } as CSSProperties}>Low</span>}
             </div>
             <div className="row" style={{ alignItems: 'baseline', gap: 6, margin: '12px 0 8px' }}>
               <span className="display" style={{ fontSize: 40 }}>{c.stock}</span>
               <span className="muted">{c.unit}</span>
               {c.issued_out > 0 && <span className="mono muted" style={{ fontSize: 11, marginLeft: 'auto' }}>{c.issued_out} out</span>}
             </div>
-            <Meter value={Math.min(1, c.stock / Math.max(c.reorder_level * 3, 1))} c1={c.is_low ? '#7a1f12' : undefined} c2={c.is_low ? '#ff6f59' : undefined} />
+            <Meter value={Math.min(1, c.stock / Math.max(c.reorder_level * 3, 1))} c2={c.is_low ? 'var(--bad)' : undefined} />
             <div className="spread" style={{ marginTop: 12 }}>
               <span className="mono muted" style={{ fontSize: 11 }}>reorder at {c.reorder_level}</span>
               <div className="row" style={{ gap: 6 }}>

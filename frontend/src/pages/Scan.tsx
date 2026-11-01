@@ -104,7 +104,7 @@ export default function Scan() {
           >
             {result.ok ? (
               <>
-                <CheckCircle size={44} weight="fill" color="var(--mint)" />
+                <CheckCircle size={44} weight="fill" color="var(--ok)" />
                 <div>
                   <div className="display" style={{ fontSize: 34 }}>You’re in.</div>
                   <div className="muted">
@@ -117,7 +117,7 @@ export default function Scan() {
               </>
             ) : (
               <>
-                <WarningCircle size={44} weight="fill" color="var(--coral)" />
+                <WarningCircle size={44} weight="fill" color="var(--bad)" />
                 <div>
                   <div className="h2">Couldn’t check in</div>
                   <div className="muted">{result.message}</div>

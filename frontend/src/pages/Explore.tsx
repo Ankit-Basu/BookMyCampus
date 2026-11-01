@@ -6,7 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 
 import { Reveal, Tilt } from '../components/motion'
 import GlareHover from '../components/reactbits/GlareHover'
-import { Empty, PageHeader, Skeleton, TypeIcon } from '../components/ui'
+import { Empty, PageHeader, Skeleton, TypeIcon, Select } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { prefetchResource } from '../lib/preload'
@@ -33,7 +33,7 @@ export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Re
           <GlareHover glareColor="#ffffff" glareOpacity={0.18} glareAngle={-35} glareSize={260} transitionDuration={700} background="transparent" borderColor="transparent" borderRadius="20px" width="100%" height="100%">
             <div className="rcard-inner">
               <div className="rcard-img">
-                {r.cover ? <img src={r.cover.replace('w=1200', 'w=640')} alt="" loading="lazy" decoding="async" /> : <div className="stripes" style={{ height: '100%' }} />}
+                {r.cover ? <img src={r.cover.replace('w=1200', 'w=480')} srcSet={`${r.cover.replace('w=1200', 'w=480')} 1x, ${r.cover.replace('w=1200', 'w=800')} 2x`} alt="" loading="lazy" decoding="async" /> : <div className="stripes" style={{ height: '100%' }} />}
                 <span className="rcard-type">
                   <TypeIcon icon={r.type_icon} size={14} /> {r.type_name}
                 </span>
@@ -50,9 +50,9 @@ export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Re
                 <div className="rcard-tags">
                   <span className="tag"><UsersThree size={12} /> {r.capacity}</span>
                   {r.requires_approval ? (
-                    <span className="tag" style={{ '--c': 'var(--amber)' } as CSSProperties}><Stamp size={12} /> Approval</span>
+                    <span className="tag" style={{ '--c': 'var(--brand)' } as CSSProperties}><Stamp size={12} /> Approval</span>
                   ) : (
-                    <span className="tag" style={{ '--c': 'var(--mint)' } as CSSProperties}><SealCheck size={12} /> Instant</span>
+                    <span className="tag" style={{ '--c': 'var(--ok)' } as CSSProperties}><SealCheck size={12} /> Instant</span>
                   )}
                   {r.features.slice(0, 2).map((f) => (
                     <span key={f} className="tag hide-sm">{f}</span>
@@ -134,7 +134,7 @@ export default function Explore() {
             autoFocus
           />
           <div className="row" style={{ gap: 10 }}>
-            <Lightning size={16} weight={freeNow ? 'fill' : 'regular'} color={freeNow ? 'var(--amber)' : undefined} className={freeNow ? '' : 'muted'} />
+            <Lightning size={16} weight={freeNow ? 'fill' : 'regular'} color={freeNow ? 'var(--brand)' : undefined} className={freeNow ? '' : 'muted'} />
             <span className="hide-sm" style={{ fontSize: 13 }}>Free this hour</span>
             <button className={`rocker ${freeNow ? 'on' : ''}`} onClick={() => set('free', freeNow ? null : '1')} aria-label="Only free this hour" />
           </div>
@@ -161,14 +161,14 @@ export default function Explore() {
         <div className="facet-row" data-reveal style={{ marginTop: 0 }}>
           <div className="row" style={{ gap: 8 }}>
             <Buildings size={16} className="muted" />
-            <select className="input" style={{ height: 34, width: 'auto', minWidth: 210, fontSize: 13 }} value={building} onChange={(e) => set('building', e.target.value || null)}>
+            <Select style={{ height: 34, width: 'auto', minWidth: 210, fontSize: 13 }} value={building} onChange={(e) => set('building', e.target.value || null)}>
               <option value="">All blocks & buildings</option>
               {facets?.buildings.map((b) => (
                 <option key={b.location__building} value={b.location__building}>
                   {b.location__building} ({b.n})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="row" style={{ gap: 10 }}>
             <UsersThree size={16} className="muted" />

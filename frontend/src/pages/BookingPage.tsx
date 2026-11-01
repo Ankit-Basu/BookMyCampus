@@ -98,7 +98,7 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
                 </div>
                 <div>
                   <div className="eyebrow">Time</div>
-                  <div className="mono" style={{ fontSize: 22, color: 'var(--amber-hi)' }}>{format(start, 'HH:mm')}–{format(end, 'HH:mm')}</div>
+                  <div className="mono" style={{ fontSize: 22, color: 'var(--brand-ink)' }}>{format(start, 'HH:mm')}–{format(end, 'HH:mm')}</div>
                   <div className="mono muted" style={{ fontSize: 11 }}>{durationLabel(b.start, b.end)}</div>
                 </div>
                 <div>
@@ -128,7 +128,7 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
           {mine && b.status === 'confirmed' && b.requires_checkin && (
             <Reveal className={`glass pad checkin-card ${w.open ? 'live' : ''}`}>
               <div className="row" style={{ gap: 10 }}>
-                <Timer size={22} color={w.open ? 'var(--mint)' : 'var(--muted)'} weight="duotone" />
+                <Timer size={22} color={w.open ? 'var(--ok)' : 'var(--fg-3)'} weight="duotone" />
                 <div className="h2">{w.open ? 'Check-in is open' : untilOpen > 0 ? 'Check-in opens soon' : 'Check-in window'}</div>
               </div>
               {w.open ? (

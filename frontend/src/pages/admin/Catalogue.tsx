@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { Drawer, Modal, StatusTag, TypeTag } from '../../components/ui'
+import { Drawer, Modal, StatusTag, TypeTag, Select } from '../../components/ui'
 import { api, blobUrl, errorMessage } from '../../lib/api'
 import { inr } from '../../lib/format'
 import type { Resource, ResourceDetail } from '../../lib/types'
@@ -63,20 +63,20 @@ function Editor({ id, onClose }: { id: number | 'new' | null; onClose: () => voi
           </div>
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label className="field"><span>Type</span>
-              <select name="type" className="input" defaultValue={r?.type}>{types?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+              <Select name="type" defaultValue={r?.type}>{types?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>
             </label>
             <label className="field"><span>Department</span>
-              <select name="department" className="input" defaultValue={r?.department ?? ''}><option value="">—</option>{depts?.map((d) => <option key={d.id} value={d.id}>{d.code}</option>)}</select>
+              <Select name="department" defaultValue={r?.department ?? ''}><option value="">—</option>{depts?.map((d) => <option key={d.id} value={d.id}>{d.code}</option>)}</Select>
             </label>
           </div>
           <label className="field"><span>Location</span>
-            <select name="location" className="input" defaultValue={r?.location ?? ''}><option value="">—</option>{locs?.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
+            <Select name="location" defaultValue={r?.location ?? ''}><option value="">—</option>{locs?.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</Select>
           </label>
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <label className="field"><span>Capacity</span><input name="capacity" type="number" min={1} className="input" defaultValue={r?.capacity ?? 1} /></label>
             <label className="field"><span>Value (₹)</span><input name="value_inr" type="number" min={0} className="input" defaultValue={r?.value_inr ?? 0} /></label>
             <label className="field"><span>Status</span>
-              <select name="status" className="input" defaultValue={r?.status ?? 'active'}><option value="active">Active</option><option value="down">Out of service</option><option value="retired">Retired</option></select>
+              <Select name="status" defaultValue={r?.status ?? 'active'}><option value="active">Active</option><option value="down">Out of service</option><option value="retired">Retired</option></Select>
             </label>
           </div>
           <label className="field"><span>Features (comma separated)</span><input name="features" className="input" defaultValue={r?.features.join(', ')} /></label>
