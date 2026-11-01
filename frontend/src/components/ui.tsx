@@ -13,11 +13,20 @@ import {
   SwimmingPool,
   UsersThree,
   Van,
-  X,
 } from '@phosphor-icons/react'
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, type CSSProperties, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { Children, isValidElement, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react'
+
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/shadcn/dialog'
+import {
+  Select as RSelect,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shadcn/select'
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/shadcn/sheet'
 
 import { STATUS_COLOR } from '../lib/format'
 
@@ -47,8 +56,8 @@ export function TypeIcon({ icon, size = 18, color }: { icon?: string; size?: num
 
 export function StatusTag({ status, label }: { status: string; label?: string }) {
   return (
-    <span className="tag" style={{ '--c': STATUS_COLOR[status] ?? 'var(--paper)' } as CSSProperties}>
-      <span className={`led ${status === 'checked_in' ? 'pulse' : ''}`} style={{ '--c': STATUS_COLOR[status], width: 6, height: 6 } as CSSProperties} />
+    <span className="tag" style={{ '--c': STATUS_COLOR[status] ?? 'var(--foreground)' } as CSSProperties}>
+      <span className="led" style={{ '--c': STATUS_COLOR[status], width: 6, height: 6 } as CSSProperties} />
       {label ?? status.replace('_', ' ')}
     </span>
   )
@@ -76,79 +85,94 @@ export function PageHeader({ eyebrow, title, sub, actions }: { eyebrow: string; 
   )
 }
 
-/** Side drawer on desktop, bottom sheet on phones. */
+/** Side panel (shadcn Sheet: focus trap, Esc, scroll lock). Same API as before. */
 export function Drawer({ open, onClose, title, children, width = 520 }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; width?: number }) {
-  useEffect(() => {
-    if (!open) return
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
-  }, [open, onClose])
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="drawer-scrim"
-            onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
-          <motion.aside
-            className="drawer glass"
-            style={{ width: `min(${width}px, 100vw)` }}
-            initial={{ x: '105%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '105%' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-            data-lenis-prevent
-          >
-            <div className="spread" style={{ marginBottom: 18 }}>
-              <div className="h2">{title}</div>
-              <button className="key key-ghost key-icon key-sm" onClick={onClose} aria-label="Close">
-                <X size={16} />
-              </button>
-            </div>
-            {children}
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>,
-    document.body,
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="drawer-panel" style={{ width: `min(${width}px, 100vw)`, maxWidth: '100vw' }} data-lenis-prevent aria-describedby={undefined}>
+        <SheetTitle className="h2" style={{ marginBottom: 18, paddingRight: 34 }}>{title}</SheetTitle>
+        <SheetDescription className="sr-only">Details panel</SheetDescription>
+        {children}
+      </SheetContent>
+    </Sheet>
   )
 }
 
 export function Modal({ open, onClose, children, width = 460 }: { open: boolean; onClose: () => void; children: ReactNode; width?: number }) {
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <motion.div className="modal-scrim" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <motion.div
-            className="glass pad-l"
-            style={{ width: `min(${width}px, calc(100vw - 32px))` }}
-            onClick={(e) => e.stopPropagation()}
-            initial={{ y: 30, scale: 0.96, opacity: 0 }}
-            animate={{ y: 0, scale: 1, opacity: 1 }}
-            exit={{ y: 20, scale: 0.97, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-          >
-            {children}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="modal-panel" style={{ width: `min(${width}px, calc(100vw - 32px))`, maxWidth: 'calc(100vw - 32px)' }} aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Dialog</DialogTitle>
+        <DialogDescription className="sr-only">Dialog content</DialogDescription>
+        {children}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+const NONE = '__none__'
+type OptionEl = ReactElement<{ value?: string | number; children?: ReactNode; label?: string }>
+
+/**
+ * Glass dropdown (shadcn Select) that is a drop-in for `<select>`: takes the same `<option>` /
+ * `<optgroup>` children, `value` + `onChange(e => e.target.value)`, or `name` + `defaultValue` for
+ * forms read with FormData (a hidden input carries the real value, including the empty "none").
+ */
+export function Select({ value, defaultValue, onChange, name, children, style, className, required }: {
+  value?: string | number | null
+  defaultValue?: string | number | null
+  onChange?: (e: { target: { value: string } }) => void
+  name?: string
+  children: ReactNode
+  style?: CSSProperties
+  className?: string
+  required?: boolean
+}) {
+  const [inner, setInner] = useState(String(defaultValue ?? ''))
+  const current = value !== undefined ? String(value ?? '') : inner
+  const renderOption = (o: OptionEl) => {
+    const v = String(o.props.value ?? '')
+    return <SelectItem key={v} value={v === '' ? NONE : v} className="select-item">{o.props.children}</SelectItem>
+  }
+  const nodes = Children.toArray(children).filter(isValidElement) as OptionEl[]
+  return (
+    <>
+      {name && <input type="hidden" name={name} value={current} required={required} />}
+      <RSelect
+        value={current === '' ? NONE : current}
+        onValueChange={(v) => {
+          const real = v === NONE ? '' : v
+          setInner(real)
+          onChange?.({ target: { value: real } })
+        }}
+      >
+        <SelectTrigger className={`input select-trigger ${className ?? ''}`} style={style}>
+          <SelectValue placeholder="Choose…" />
+        </SelectTrigger>
+        <SelectContent className="pop-glass" position="popper" sideOffset={6}>
+          {nodes.map((n, i) =>
+            n.type === 'optgroup' ? (
+              <SelectGroup key={i}>
+                <SelectLabel className="select-label">{n.props.label}</SelectLabel>
+                {(Children.toArray(n.props.children).filter(isValidElement) as OptionEl[]).map(renderOption)}
+              </SelectGroup>
+            ) : (
+              renderOption(n)
+            ),
+          )}
+        </SelectContent>
+      </RSelect>
+    </>
   )
 }
 
 /** Analog instrument dial — utilisation reads like a gauge on a lab bench. */
-export function Dial({ value, label, size = 168, color = 'var(--amber)' }: { value: number; label: string; size?: number; color?: string }) {
+export function Dial({ value, label, size = 168, color = 'var(--brand)' }: { value: number; label: string; size?: number; color?: string }) {
   const v = Math.max(0, Math.min(1, value))
   const start = -220
   const sweep = 260
   const angle = start + sweep * v
-  const r = 70
+  const r = 72
   const ticks = Array.from({ length: 27 }, (_, i) => i)
   const polar = (deg: number, rad: number) => {
     const a = ((deg + 90) * Math.PI) / 180
@@ -159,37 +183,25 @@ export function Dial({ value, label, size = 168, color = 'var(--amber)' }: { val
     const [x2, y2] = polar(to, rad)
     return `M ${x1} ${y1} A ${rad} ${rad} 0 ${to - from > 180 ? 1 : 0} 1 ${x2} ${y2}`
   }
-  const [nx, ny] = polar(angle, 58)
+  const [nx, ny] = polar(angle, 60)
   return (
     <svg viewBox="0 0 200 200" width={size} height={size} role="img" aria-label={`${label} ${Math.round(v * 100)}%`}>
-      <defs>
-        <radialGradient id="dial-face" cx="50%" cy="40%" r="65%">
-          <stop offset="0" stopColor="#1d2140" />
-          <stop offset="1" stopColor="#07080f" />
-        </radialGradient>
-        <linearGradient id="dial-rim" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#4b4f73" />
-          <stop offset="1" stopColor="#0b0c18" />
-        </linearGradient>
-      </defs>
-      <circle cx="100" cy="100" r="96" fill="url(#dial-rim)" />
-      <circle cx="100" cy="100" r="90" fill="url(#dial-face)" stroke="rgba(0,0,0,.6)" />
-      <path d={arc(start, start + sweep, r)} stroke="rgba(255,255,255,.08)" strokeWidth="8" fill="none" strokeLinecap="round" />
-      {v > 0.003 && (
-        <path d={arc(start, angle, r)} stroke={color} strokeWidth="8" fill="none" strokeLinecap="round" style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
-      )}
+      <circle cx="100" cy="100" r="97" fill="var(--dial-rim)" />
+      <circle cx="100" cy="100" r="91" fill="var(--dial-face)" />
+      <path d={arc(start, start + sweep, r)} stroke="var(--line-2)" strokeWidth="9" fill="none" strokeLinecap="round" />
+      {v > 0.003 && <path d={arc(start, angle, r)} stroke={color} strokeWidth="9" fill="none" strokeLinecap="round" />}
       {ticks.map((i) => {
         const deg = start + (sweep / 26) * i
-        const [x1, y1] = polar(deg, 82)
-        const [x2, y2] = polar(deg, i % 5 === 0 ? 74 : 78)
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(255,255,255,.35)" strokeWidth={i % 5 === 0 ? 1.6 : 0.8} />
+        const [x1, y1] = polar(deg, 86)
+        const [x2, y2] = polar(deg, i % 5 === 0 ? 80 : 83)
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--fg-3)" strokeWidth={i % 5 === 0 ? 1.4 : 0.7} />
       })}
-      <line x1="100" y1="100" x2={nx} y2={ny} stroke="#ffe7b8" strokeWidth="2.4" strokeLinecap="round" style={{ transition: 'all 1s cubic-bezier(.22,1,.36,1)' }} />
-      <circle cx="100" cy="100" r="7" fill="#2a2e4a" stroke="#ffd27a" strokeWidth="1.5" />
-      <text x="100" y="138" textAnchor="middle" fill="#f4efe6" fontFamily="JetBrains Mono" fontSize="22" fontWeight="700">
+      <line x1="100" y1="100" x2={nx} y2={ny} stroke="var(--foreground)" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="100" cy="100" r="6.5" fill="var(--dial-face)" stroke="var(--foreground)" strokeWidth="2" />
+      <text x="100" y="140" textAnchor="middle" fill="var(--foreground)" fontFamily="Bricolage Grotesque" fontSize="26" fontWeight="700">
         {Math.round(v * 100)}%
       </text>
-      <text x="100" y="156" textAnchor="middle" fill="#8d8aa3" fontFamily="JetBrains Mono" fontSize="8.5" letterSpacing="2">
+      <text x="100" y="157" textAnchor="middle" fill="var(--fg-3)" fontFamily="Geist Mono" fontSize="7.2" letterSpacing="1.4">
         {label.toUpperCase()}
       </text>
     </svg>

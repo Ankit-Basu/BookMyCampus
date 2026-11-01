@@ -14,7 +14,10 @@ export function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
     window.scrollTo(0, 0)
-    const id = setTimeout(() => ScrollTrigger.refresh(), 200)
+    const id = setTimeout(() => {
+      // A refresh forces a full layout, so skip it on pages with no scroll scenes.
+      if (ScrollTrigger.getAll().length) ScrollTrigger.refresh()
+    }, 200)
     return () => clearTimeout(id)
   }, [pathname])
   return null
@@ -46,29 +49,9 @@ export function SmoothScroll() {
   useEffect(() => {
     lenisRef.current?.scrollTo(0, { immediate: true })
     window.scrollTo(0, 0)
-    const id = setTimeout(() => ScrollTrigger.refresh(), 250)
-    return () => clearTimeout(id)
   }, [pathname])
 
   return null
-}
-
-/** Soft amber light that trails the pointer across the glass — makes the panes feel physical. */
-export function CursorGlow() {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (reduced() || window.matchMedia('(pointer: coarse)').matches) return
-    const el = ref.current!
-    const xTo = gsap.quickTo(el, 'x', { duration: 0.6, ease: 'power3' })
-    const yTo = gsap.quickTo(el, 'y', { duration: 0.6, ease: 'power3' })
-    const move = (e: PointerEvent) => {
-      xTo(e.clientX)
-      yTo(e.clientY)
-    }
-    window.addEventListener('pointermove', move)
-    return () => window.removeEventListener('pointermove', move)
-  }, [])
-  return <div ref={ref} className="cursor-glow" aria-hidden />
 }
 
 /**

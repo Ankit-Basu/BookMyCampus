@@ -19,14 +19,14 @@ export const inr = (n: number) =>
 export const pct = (v: number, digits = 0) => `${(v * 100).toFixed(digits)}%`
 
 export const STATUS_COLOR: Record<string, string> = {
-  pending: 'var(--amber)',
-  confirmed: 'var(--sky)',
-  checked_in: 'var(--mint)',
-  completed: 'var(--muted)',
-  rejected: 'var(--coral)',
-  cancelled: 'var(--faint)',
-  released: 'var(--rose)',
-  displaced: 'var(--violet)',
+  pending: 'var(--brand)',
+  confirmed: 'var(--info)',
+  checked_in: 'var(--ok)',
+  completed: 'var(--fg-3)',
+  rejected: 'var(--bad)',
+  cancelled: 'var(--fg-4)',
+  released: 'var(--bad)',
+  displaced: 'var(--chart-4)',
 }
 
 export const ROLE_LABEL: Record<string, string> = {

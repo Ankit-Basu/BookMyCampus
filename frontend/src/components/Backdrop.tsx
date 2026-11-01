@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { useTheme } from '../lib/theme'
 import Grainient from './reactbits/bg/Grainient'
 
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -10,13 +11,14 @@ const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('
  * backdrop-filter is recomputed whenever the pixels behind it change, so an animated backdrop
  * would re-blur every panel on screen every frame. A still one costs nothing after first paint.
  */
-export default function Backdrop({ vivid = false }: { vivid?: boolean }) {
+export default function Backdrop() {
+  const { palette } = useTheme()
   return (
-    <div className={`backdrop ${vivid ? 'vivid' : ''}`} aria-hidden>
+    <div className="backdrop" aria-hidden>
       <Grainient
-        color1="#f5a524"
-        color2="#6a3dff"
-        color3="#07080f"
+        color1={palette.shader[0]}
+        color2={palette.shader[1]}
+        color3={palette.shader[2]}
         timeSpeed={0.12}
         warpStrength={1.1}
         warpFrequency={4}
@@ -39,7 +41,8 @@ export default function Backdrop({ vivid = false }: { vivid?: boolean }) {
 }
 
 /** Click sparks on a viewport-sized canvas that only animates while sparks are alive. */
-export function Sparks({ color = '#ffd27a' }: { color?: string }) {
+export function Sparks() {
+  const color = useTheme().palette.burst[3]
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     if (reducedMotion()) return
