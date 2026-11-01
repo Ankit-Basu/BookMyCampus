@@ -16,6 +16,7 @@ from django.utils import timezone
 from apps.accounts.models import Department, Role, User
 from apps.analytics.models import UtilisationSnapshot
 from apps.approvals.models import Approval, ApprovalStep, ApprovalWorkflow
+from apps.bookings.exceptions import BookingError
 from apps.bookings.models import Booking, BookingAttempt, BookingSlot, CheckIn, NoShow, RecurrenceRule
 from apps.bookings.services import _insert, tsrange
 from apps.catalogue.models import Custodian, Location, Resource, ResourceAttribute, ResourceType
@@ -518,7 +519,15 @@ class Command(BaseCommand):
         for code, d, h1, h2, title, kind in past:
             MaintenanceWindow.objects.create(resource=R[code], kind=kind, title=title, period=tsrange(at(d, h1), at(d, h2)),
                                              status="done", resolved_at=at(d, h2), reported_by=self.custodian)
-        schedule_maintenance(R["SP-BASK-1"], at(5, 6), at(5, 14), title="Floor re-varnish", notes="Court closed until the varnish cures.", by=self.sports)
-        schedule_maintenance(R["LAB-38-MOL"], at(11, 8), at(11, 13), title="Fume hood certification", by=self.custodian2)
-        schedule_maintenance(R["EQ-SCOPE-01"], at(0, 0), at(2, 18), title="Channel 3 noisy — sent for calibration",
+        # Offsets from "today" can land on a timetabled class on some weekdays; a clash here only means
+        # one less demo window, so it must never abort the seed.
+        def try_schedule(*args, **kw):
+            try:
+                schedule_maintenance(*args, **kw)
+            except BookingError as exc:
+                self.stdout.write(f"maintenance demo skipped: {args[0].code}: {exc.message}")
+
+                try_schedule(R["SP-BASK-1"], at(5, 6), at(5, 14), title="Floor re-varnish", notes="Court closed until the varnish cures.", by=self.sports)
+        try_schedule(R["LAB-38-MOL"], at(11, 8), at(11, 13), title="Fume hood certification", by=self.custodian2)
+        try_schedule(R["EQ-SCOPE-01"], at(0, 0), at(2, 18), title="Channel 3 noisy — sent for calibration",
                              kind=MaintenanceWindow.Kind.BREAKDOWN, by=self.custodian)
