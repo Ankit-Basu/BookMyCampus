@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.conf import settings
@@ -169,12 +170,18 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         if raw.startswith("BMC:"):
             try:
                 _, bid, token = raw.split(":", 2)
+                b = Booking.objects.select_related("resource").filter(pk=int(bid)).first()
             except ValueError:
+                b = None
+            if b is None:
                 raise BookingError("bad_token", "Unrecognised booking pass.")
-            b = get_object_or_404(Booking.objects.select_related("resource"), pk=int(bid))
             b = services.check_in(b, request.user, token)
         else:
             token = raw.split("r=")[-1].split("&")[0] if "r=" in raw else raw
+            try:
+                uuid.UUID(token)
+            except ValueError:
+                raise BookingError("bad_token", "That isn't a BookMyCampus room code.")
             b = services.check_in_by_resource_token(request.user, token)
         return Response(BookingDetailSerializer(b).data)
 

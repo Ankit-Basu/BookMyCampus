@@ -27,6 +27,12 @@ class ApiTest(APITestCase):
         self.prof = make_user("prof", Role.FACULTY, self.dept)
         self.manager = make_user("mgr", Role.FACILITY_MANAGER, self.dept)
 
+    def test_scan_refuses_junk_codes_without_crashing(self):
+        self.as_(self.student)
+        for code in ("not-a-token", "", "BMC:abc:def", "BMC:999999:x", "BMC:bad", "https://x.test/scan?r=nope"):
+            r = self.client.post("/api/bookings/scan", {"code": code}, format="json")
+            self.assertEqual((r.status_code, r.data["error"]), (400, "bad_token"), code)
+
     def as_(self, user):
         self.client.force_authenticate(user)
 
