@@ -1,16 +1,116 @@
 import { CalendarBlank, ShieldWarning, Warning } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import type { AxiosError } from 'axios'
 import { format } from 'date-fns'
-import { type CSSProperties } from 'react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
 import { toast } from 'sonner'
 
 import { Reveal } from '../components/motion'
-import { Dial, PageHeader } from '../components/ui'
-import { api } from '../lib/api'
+import { Dial, PageHeader, Select } from '../components/ui'
+import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import type { Booking } from '../lib/types'
 
 type Policy = { grace_minutes: number; strike_warn: number; strike_level1: number; restrict_days_level1: number; strike_level2: number; restrict_days_level2: number; noshow_window_days: number }
+
+const fieldErrors = (e: unknown): Record<string, string> => {
+  const data = (e as AxiosError<Record<string, unknown>>).response?.data ?? {}
+  return Object.fromEntries(Object.entries(data).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, String((v as string[])[0])]))
+}
+
+function EditDetails() {
+  const { user, refresh } = useAuth()
+  const [form, setForm] = useState({ first_name: user!.first_name, last_name: user!.last_name, email: user!.email, phone: user!.phone ?? '', department: String(user!.department ?? '') })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const { data: depts = [] } = useQuery({ queryKey: ['public-depts'], queryFn: () => api.get<{ id: number; name: string }[]>('/auth/departments').then((r) => r.data) })
+  const save = useMutation({
+    mutationFn: () => api.patch('/me', { ...form, department: form.department ? Number(form.department) : null }),
+    onSuccess: async () => {
+      setErrors({})
+      await refresh()
+      toast.success('Details saved')
+    },
+    onError: (e) => {
+      const f = fieldErrors(e)
+      setErrors(f)
+      if (!Object.keys(f).length) toast.error(errorMessage(e))
+    },
+  })
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  return (
+    <Reveal className="glass pad">
+      <div className="eyebrow" style={{ marginBottom: 12 }}>Your details</div>
+      <form className="col" style={{ gap: 12 }} onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate() }}>
+        <div className="field-row">
+          <label className="field"><span>First name</span><input className="input" value={form.first_name} onChange={set('first_name')} autoComplete="given-name" required /></label>
+          <label className="field"><span>Last name</span><input className="input" value={form.last_name} onChange={set('last_name')} autoComplete="family-name" /></label>
+        </div>
+        <label className="field">
+          <span>Email</span><input className="input" type="email" value={form.email} onChange={set('email')} autoComplete="email" />
+          {errors.email && <small className="field-error" role="alert">{errors.email}</small>}
+        </label>
+        <label className="field">
+          <span>Phone</span><input className="input" type="tel" maxLength={20} value={form.phone} onChange={set('phone')} autoComplete="tel" />
+          {errors.phone && <small className="field-error" role="alert">{errors.phone}</small>}
+        </label>
+        {depts.length > 0 && (
+          <label className="field">
+            <span>Department</span>
+            <Select value={form.department} onChange={set('department')}>
+              <option value="">Not set</option>
+              {depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </Select>
+          </label>
+        )}
+        <button className="key key-amber" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save details'}</button>
+      </form>
+    </Reveal>
+  )
+}
+
+function ChangePassword() {
+  const empty = { current_password: '', new_password: '', confirm: '' }
+  const [form, setForm] = useState(empty)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const change = useMutation({
+    mutationFn: () => api.post('/me/password', { current_password: form.current_password, new_password: form.new_password }),
+    onSuccess: () => {
+      setForm(empty)
+      setErrors({})
+      toast.success('Password changed. Use the new one next time you sign in.')
+    },
+    onError: (e) => {
+      const f = fieldErrors(e)
+      setErrors(f)
+      if (!Object.keys(f).length) toast.error(errorMessage(e))
+    },
+  })
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (form.new_password !== form.confirm) return setErrors({ confirm: 'The two passwords do not match.' })
+    change.mutate()
+  }
+  const input = (k: keyof typeof empty, label: string, auto: string) => (
+    <label className="field">
+      <span>{label}</span>
+      <input className="input" type="password" value={form[k]} onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} autoComplete={auto} />
+      {errors[k] && <small className="field-error" role="alert">{errors[k]}</small>}
+    </label>
+  )
+  return (
+    <Reveal className="glass pad">
+      <div className="eyebrow" style={{ marginBottom: 12 }}>Change password</div>
+      <form className="col" style={{ gap: 12 }} onSubmit={submit}>
+        {input('current_password', 'Current password', 'current-password')}
+        {input('new_password', 'New password', 'new-password')}
+        {input('confirm', 'Confirm new password', 'new-password')}
+        <button className="key key-ghost" disabled={!form.current_password || !form.new_password || !form.confirm || change.isPending}>
+          {change.isPending ? 'Changing…' : 'Change password'}
+        </button>
+      </form>
+    </Reveal>
+  )
+}
 
 export default function Profile() {
   const { user } = useAuth()
@@ -31,7 +131,7 @@ export default function Profile() {
 
   return (
     <div className="page" style={{ maxWidth: 1080 }}>
-      <PageHeader eyebrow={`${user.role_label}${user.department_code ? ` · ${user.department_code}` : ''}`} title={<>{user.first_name} <em>{user.last_name}</em></>} sub={`UMS ID ${user.username}${user.email ? ` · ${user.email}` : ''}`} />
+      <PageHeader eyebrow={`${user.role_label}${user.department_code ? ` · ${user.department_code}` : ''}`} title={<>{user.first_name} <em>{user.last_name}</em></>} sub={`Reg. no. ${user.username}${user.email ? ` · ${user.email}` : ''}`} />
 
       {user.is_restricted && (
         <div className="glass pad notice-bad" style={{ marginBottom: 18 }}>
@@ -84,6 +184,8 @@ export default function Profile() {
             <CalendarBlank /> Copy feed URL
           </button>
         </Reveal>
+        <EditDetails />
+        <ChangePassword />
       </div>
     </div>
   )

@@ -34,7 +34,7 @@ export const ROLE_LABEL: Record<string, string> = {
   faculty: 'Faculty',
   staff: 'Staff',
   custodian: 'Custodian',
-  dept_head: 'Head of Dept.',
+  dept_head: 'HOD',
   facility_manager: 'Facility Manager',
   admin: 'Administrator',
 }

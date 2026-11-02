@@ -35,9 +35,12 @@ router.register("users", accounts.UserViewSet)
 
 api = [
     path("auth/login", accounts.LoginView.as_view()),
+    path("auth/register", accounts.RegisterView.as_view()),
+    path("auth/departments", accounts.public_departments),
     path("auth/refresh", accounts.SafeRefreshView.as_view()),
     path("auth/demo-accounts", accounts.demo_accounts),
     path("me", accounts.MeView.as_view()),
+    path("me/password", accounts.ChangePasswordView.as_view()),
     path("policy", rules.policy_view),
     path("approvals/queue", approvals.approval_queue),
     path("timetable/publish", timetable.publish),

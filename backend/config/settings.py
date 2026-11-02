@@ -125,6 +125,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": None,
     "EXCEPTION_HANDLER": "apps.bookings.exceptions.exception_handler",
+    # Per IP, and a whole hostel can share one IP, so this only stops scripted sign-ups.
+    "DEFAULT_THROTTLE_RATES": {"register": "60/hour", "password": "20/hour"},
 }
 
 SIMPLE_JWT = {

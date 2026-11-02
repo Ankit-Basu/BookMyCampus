@@ -1,37 +1,31 @@
-import { ArrowRight, IdentificationBadge, LockKey, SignIn } from '@phosphor-icons/react'
+import { ArrowRight, CalendarCheck, IdentificationBadge, LockKey, QrCode, SignIn, Sparkle } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { ThemeMenu, Wordmark } from '../components/AppShell'
-import Grainient from '../components/reactbits/bg/Grainient'
-import { Sparks } from '../components/Backdrop'
+import AuthLayout from '../components/AuthLayout'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { useTheme } from '../lib/theme'
 import { ROLE_LABEL } from '../lib/format'
 
 type Demo = { username: string; name: string; role: string; role_label: string; password: string }
 
 const ROLE_BLURB: Record<string, string> = {
-  student: 'Browse, book, scan in',
-  faculty: 'Recurring & class bookings',
-  staff: 'Broader booking rights',
-  custodian: 'Approvals, maintenance, stock',
-  dept_head: 'Quotas & dept. utilisation',
-  facility_manager: 'Campus-wide policy',
-  admin: 'Types, workflows, everything',
+  student: 'Book for yourself or your class, scan in',
+  faculty: 'Book labs and rooms, repeat weekly for a class',
+  dept_head: 'Approve requests, add rooms, see usage',
 }
 
 export default function Login() {
   const { user, login } = useAuth()
-  const { palette } = useTheme()
   const nav = useNavigate()
   const [params] = useSearchParams()
   const next = params.get('next') || '/explore'
-  const [username, setUsername] = useState('')
+  const { state, search } = useLocation()
+  const justRegistered = (state as { username?: string } | null)?.username
+  const [username, setUsername] = useState(justRegistered ?? '')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const { data: demos } = useQuery({ queryKey: ['demo'], queryFn: () => api.get<Demo[]>('/auth/demo-accounts').then((r) => r.data) })
@@ -45,53 +39,29 @@ export default function Login() {
       toast.success(`Welcome, ${me.first_name || me.username}`)
       nav(next, { replace: true })
     } catch (e) {
-      toast.error(errorMessage(e) === 'No active account found with the given credentials' ? 'Wrong UMS ID or password' : errorMessage(e))
+      toast.error(errorMessage(e) === 'No active account found with the given credentials' ? 'Wrong registration number or password. New here? Create an account first.' : errorMessage(e))
     } finally {
       setBusy(null)
     }
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    go(username, password)
+    go(username.trim(), password)
   }
 
   return (
-    <div className="login">
-      <div className="login-bg">
-        <Grainient
-          color1={palette.shader[0]}
-          color2={palette.shader[1]}
-          color3={palette.shader[2]}
-          timeSpeed={0.18}
-          warpAmplitude={70}
-          blendSoftness={0.18}
-          grainAmount={0.06}
-          contrast={1.3}
-          zoom={0.8}
-          renderScale={0.35}
-          maxFps={24}
-        />
-        <div className="login-shade" />
-        <div className="grain" />
-      </div>
-      <Sparks />
-      <div className="login-top">
-        <Wordmark />
-        <ThemeMenu />
-      </div>
-      <div className="login-grid">
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}>
-          <div className="eyebrow">Sign in</div>
-          <h1 className="display" style={{ fontSize: 'clamp(46px,6.4vw,92px)', fontWeight: 800, margin: '8px 0 14px' }}>
-            Your campus,
-            <br />
-            <em>on reservation.</em>
-          </h1>
-          <p style={{ maxWidth: 440, color: 'var(--fg-2)' }}>
-            Use your UMS registration or employee ID. Demo personas below sign you in instantly — try the student first, then a custodian to approve what they asked for.
-          </p>
-        </motion.div>
-
+    <AuthLayout
+      eyebrow="Sign in"
+      title={<>Your campus,<br /><em>on reservation.</em></>}
+      blurb="Sign in with your registration number. Trying it out? The demo personas sign you in instantly: request a lab as the student, then approve it as the HOD."
+      aside={
+        <ul className="auth-list">
+          <li><CalendarCheck size={20} weight="duotone" /><span><strong>See what’s free right now</strong>Live availability that already knows the timetable.</span></li>
+          <li><QrCode size={20} weight="duotone" /><span><strong>Your pass is on your phone</strong>Scan the door when you arrive and you’re in.</span></li>
+          <li><Sparkle size={20} weight="duotone" /><span><strong>Or just ask Copilot</strong>“Find a quiet room in Block 34 for six people.”</span></li>
+        </ul>
+      }
+    >
         <motion.form
           onSubmit={submit}
           className="glass pad-l login-card"
@@ -101,32 +71,31 @@ export default function Login() {
         >
           <div className="col" style={{ gap: 14 }}>
             <label className="field">
-              <span>UMS ID</span>
+              <span>Registration number</span>
               <div className="input-icon">
                 <IdentificationBadge size={18} />
-                <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. 12215634 or demo.student" autoComplete="username" />
+                <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. 12306448" autoComplete="username" />
               </div>
             </label>
             <label className="field">
               <span>Password</span>
               <div className="input-icon">
                 <LockKey size={18} />
-                <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
+                <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" autoFocus={!!justRegistered} />
               </div>
             </label>
             <button className="key key-amber key-lg" disabled={!username || !password || !!busy} style={{ marginTop: 6 }}>
               <SignIn weight="bold" /> {busy === username ? 'Signing in…' : 'Sign in'}
             </button>
-            <button type="button" className="key key-ghost" onClick={() => toast.info('UMS single sign-on plugs in here — the SSO hook is ready in accounts/.')}>
-              Continue with LPU UMS SSO
-            </button>
+            <Link to={`/register${search}`} className="key key-ghost">Create an account</Link>
+            <p className="auth-switch muted" style={{ fontSize: 12.5 }}>Forgot your password? The facility office can reset it for you.</p>
           </div>
 
           {!!demos?.length && (
             <>
               <div className="divider" />
               <div className="eyebrow" style={{ marginBottom: 12 }}>One-click demo personas</div>
-              <div className="persona-grid">
+              <div className="persona-grid persona-list">
                 {demos.map((d) => (
                   <button type="button" key={d.username} className="persona" onClick={() => go(d.username, d.password)} disabled={!!busy}>
                     <span className="avatar sm">{d.name.split(' ').map((p) => p[0]).join('')}</span>
@@ -141,7 +110,6 @@ export default function Login() {
             </>
           )}
         </motion.form>
-      </div>
-    </div>
+    </AuthLayout>
   )
 }

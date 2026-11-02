@@ -1,6 +1,7 @@
 export type Role = 'student' | 'faculty' | 'staff' | 'custodian' | 'dept_head' | 'facility_manager' | 'admin'
 
 export type User = {
+  phone: string
   id: number
   username: string
   name: string
@@ -22,6 +23,7 @@ export type User = {
 }
 
 export type Resource = {
+  is_saved: boolean
   id: number
   code: string
   name: string

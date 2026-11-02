@@ -4,18 +4,44 @@ from datetime import timedelta
 
 from django.db.models import Count, Q
 from rest_framework import generics, mixins, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .models import Department, Role, User
 from .permissions import IsManager, IsPolicyAdmin, ReadOnlyOrPolicyAdmin
-from .serializers import AdminUserSerializer, DepartmentSerializer, LoginSerializer, UserSerializer
+from .serializers import (
+    AdminUserSerializer,
+    ChangePasswordSerializer,
+    DepartmentSerializer,
+    LoginSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
+
+
+class RegisterView(generics.CreateAPIView):
+    """Student self sign-up. Issues no tokens: the new account signs in through /auth/login like any other."""
+
+    serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def public_departments(request):
+    """The department picker on the sign-up form, shown before anyone has a token."""
+    return Response(list(Department.objects.values("id", "code", "name")))
 
 
 class MeView(generics.RetrieveUpdateAPIView):
@@ -23,6 +49,21 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    """Throttled because it answers whether a guessed password is right."""
+
+    serializer_class = ChangePasswordSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password"
+
+    def post(self, request):
+        s = self.get_serializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        request.user.set_password(s.validated_data["new_password"])
+        request.user.save(update_fields=["password"])
+        return Response({"changed": True})
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -80,11 +121,11 @@ class UserViewSet(mixins.CreateModelMixin, mixins.UpdateModelMixin, viewsets.Rea
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def demo_accounts(request):
-    """One-click personas on the login screen (only exposed while DEBUG is on)."""
+    """One-click personas on the login screen (only exposed while DEBUG is on). Three is all a demo needs."""
     if not settings.DEBUG:
         return Response([])
     out = []
-    for role in Role.values:
+    for role in (Role.STUDENT, Role.FACULTY, Role.DEPT_HEAD):
         u = User.objects.filter(role=role, username__startswith="demo.").order_by("id").first()
         if u:
             out.append({"username": u.username, "name": u.get_full_name(), "role": role, "role_label": Role(role).label, "password": settings.DEMO_PASSWORD})

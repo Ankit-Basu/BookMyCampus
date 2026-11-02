@@ -8,6 +8,7 @@ import { pages } from './lib/preload'
 
 const Landing = lazy(() => import('./pages/Landing'))
 const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
 const Explore = lazy(pages.explore)
 const ResourcePage = lazy(pages.resource)
 const MyBookings = lazy(pages.bookings)
@@ -55,6 +56,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route element={<RequireAuth />}>
             <Route element={<Page />}>
               <Route path="/explore" element={<Explore />} />

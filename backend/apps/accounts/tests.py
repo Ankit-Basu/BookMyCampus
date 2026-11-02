@@ -1,7 +1,11 @@
 from datetime import timedelta
+from unittest.mock import patch
+
+from django.core.cache import cache
 from django.utils import timezone
 from django.test import override_settings
 from rest_framework.test import APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import Department, Role, User
@@ -201,3 +205,117 @@ class DepartmentAndUserManagementTest(APITestCase):
         self.student.refresh_from_db()
         self.assertFalse(self.student.is_restricted)
         self.assertIsNone(self.student.restricted_until)
+
+
+class RegisterTest(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.dept = Department.objects.create(code="CSE", name="Computer Science")
+        self.body = {
+            "registration_no": "12306448",
+            "first_name": "Asha",
+            "last_name": "Rao",
+            "email": "Asha.Rao@lpu.in",
+            "department": self.dept.id,
+            "password": "fresh-pass-42",
+        }
+
+    def test_register_then_sign_in_with_the_same_credentials(self):
+        r = self.client.post("/api/auth/register", self.body, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertNotIn("access", r.data)
+        self.assertNotIn("password", r.data)
+
+        u = User.objects.get(username="12306448")
+        self.assertEqual((u.role, u.department, u.email), (Role.STUDENT, self.dept, "asha.rao@lpu.in"))
+
+        wrong = self.client.post("/api/auth/login", {"username": "12306448", "password": "not-the-one"}, format="json")
+        self.assertEqual(wrong.status_code, 401)
+        ok = self.client.post("/api/auth/login", {"username": "12306448", "password": "fresh-pass-42"}, format="json")
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(ok.data["user"]["role"], "student")
+
+    def test_request_cannot_choose_its_own_privileges(self):
+        extra = {"role": "admin", "is_staff": True, "is_superuser": True, "username": "someone.else"}
+        self.assertEqual(self.client.post("/api/auth/register", {**self.body, **extra}, format="json").status_code, 201)
+        u = User.objects.get(username="12306448")
+        self.assertEqual(u.role, Role.STUDENT)
+        self.assertFalse(u.is_staff or u.is_superuser or u.is_manager)
+        self.assertFalse(User.objects.filter(username="someone.else").exists())
+
+    def test_registration_number_must_be_eight_digits(self):
+        for bad in ("1230644", "123064480", "1230644a", "demo.admin", ""):
+            r = self.client.post("/api/auth/register", {**self.body, "registration_no": bad}, format="json")
+            self.assertEqual(r.status_code, 400, bad)
+            self.assertIn("registration_no", r.data)
+
+    def test_duplicates_are_refused_and_the_first_account_is_untouched(self):
+        self.client.post("/api/auth/register", self.body, format="json")
+        again = self.client.post("/api/auth/register", {**self.body, "email": "other@lpu.in", "password": "attacker-pass-1"}, format="json")
+        self.assertEqual(again.status_code, 400)
+        self.assertIn("registration_no", again.data)
+        self.assertTrue(User.objects.get(username="12306448").check_password("fresh-pass-42"))
+
+        same_mail = self.client.post("/api/auth/register", {**self.body, "registration_no": "12306449", "email": "ASHA.RAO@LPU.IN"}, format="json")
+        self.assertEqual(same_mail.status_code, 400)
+        self.assertIn("email", same_mail.data)
+
+    def test_weak_passwords_are_refused(self):
+        for bad in ("short", "12306448"):
+            r = self.client.post("/api/auth/register", {**self.body, "password": bad}, format="json")
+            self.assertEqual(r.status_code, 400, bad)
+            self.assertIn("password", r.data)
+        self.assertFalse(User.objects.filter(username="12306448").exists())
+
+    def test_public_endpoints_ignore_a_stale_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer expired.or.garbage")
+        d = self.client.get("/api/auth/departments")
+        self.assertEqual(d.status_code, 200)
+        self.assertEqual(d.data, [{"id": self.dept.id, "code": "CSE", "name": "Computer Science"}])
+        self.assertEqual(self.client.post("/api/auth/register", self.body, format="json").status_code, 201)
+
+    def test_scripted_sign_ups_are_throttled(self):
+        with patch.object(ScopedRateThrottle, "THROTTLE_RATES", {"register": "2/hour"}):
+            codes = [self.client.post("/api/auth/register", {**self.body, "registration_no": "bad"}, format="json").status_code for _ in range(3)]
+        self.assertEqual(codes, [400, 400, 429])
+
+
+class ProfileTest(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(username="12306448", password="old-pass-123", email="a@lpu.in")
+        User.objects.create_user(username="12306449", password="x-pass-1234", email="b@lpu.in")
+        self.client.force_authenticate(self.user)
+
+    def test_change_password_then_sign_in_with_the_new_one(self):
+        r = self.client.post("/api/me/password", {"current_password": "old-pass-123", "new_password": "new-pass-456"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post("/api/auth/login", {"username": "12306448", "password": "old-pass-123"}, format="json").status_code, 401)
+        self.assertEqual(self.client.post("/api/auth/login", {"username": "12306448", "password": "new-pass-456"}, format="json").status_code, 200)
+
+    def test_change_password_refuses_bad_input(self):
+        for body, field in (
+            ({"current_password": "wrong", "new_password": "new-pass-456"}, "current_password"),
+            ({"current_password": "old-pass-123", "new_password": "short"}, "new_password"),
+            ({"current_password": "old-pass-123", "new_password": "12306448"}, "new_password"),
+        ):
+            r = self.client.post("/api/me/password", body, format="json")
+            self.assertEqual(r.status_code, 400, body)
+            self.assertIn(field, r.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("old-pass-123"))
+
+    def test_change_password_needs_sign_in(self):
+        self.client.force_authenticate(None)
+        r = self.client.post("/api/me/password", {"current_password": "old-pass-123", "new_password": "new-pass-456"}, format="json")
+        self.assertEqual(r.status_code, 401)
+
+    def test_edit_profile_cannot_raise_privileges_or_steal_an_email(self):
+        ok = self.client.patch("/api/me", {"phone": "9876543210", "first_name": "Asha", "email": "A@lpu.in", "role": "admin"}, format="json")
+        self.assertEqual(ok.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual((self.user.phone, self.user.first_name, self.user.role), ("9876543210", "Asha", Role.STUDENT))
+        taken = self.client.patch("/api/me", {"email": "B@LPU.IN"}, format="json")
+        self.assertEqual(taken.status_code, 400)
+        self.assertIn("email", taken.data)
