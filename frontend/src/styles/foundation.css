@@ -846,11 +846,9 @@ textarea.input {
   padding: 26px !important;
   gap: 0 !important;
   overflow-y: auto;
-  background: color-mix(in oklab, var(--popover) 90%, transparent) !important;
+  background: var(--popover) !important;
   color: var(--fg) !important;
   border-left: 1px solid var(--glass-edge) !important;
-  backdrop-filter: blur(24px) saturate(170%);
-  -webkit-backdrop-filter: blur(24px) saturate(170%);
 }
 .modal-panel {
   padding: 30px !important;

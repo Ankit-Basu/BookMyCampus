@@ -1,5 +1,5 @@
-/* Campus Copilot: a floating glass panel. Solid enough to read over anything, no live blur on the
-   feed itself so long conversations scroll smoothly. */
+/* Campus Copilot: a floating panel, solid so the page never shows through the text, with no live
+   blur so long conversations scroll smoothly. */
 
 .copilot-launcher-container {
   position: fixed;
@@ -65,7 +65,7 @@
   overflow: hidden;
   border-radius: var(--r-l);
   color: var(--fg);
-  background: color-mix(in oklab, var(--popover) 94%, transparent);
+  background: var(--popover);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--shadow-lg), inset 0 1px 0 rgb(255 255 255 / 0.14);
 }
