@@ -12,19 +12,20 @@ import time
 from datetime import timedelta
 
 from dateutil.rrule import DAILY, WEEKLY, rrule
+from django.conf import settings
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from psycopg.types.range import Range
 
-from apps.accounts.models import User
+from apps.accounts.models import Role, User
 from apps.notifications.models import Notification
 from apps.notifications.services import notify
 from apps.rules.models import Policy
 from apps.rules.services import validate_request
 
 from .exceptions import BookingError, RuleViolation, SlotConflict, is_deadlock, is_exclusion_violation
-from .models import Booking, BookingAttempt, BookingSlot, CheckIn, NoShow, RecurrenceRule
+from .models import Booking, BookingAttempt, BookingSlot, CheckIn, NoShow, RecurrenceRule, SlotWatch
 
 MAX_OCCURRENCES = 52
 DEADLOCK_RETRIES = 25
@@ -67,12 +68,13 @@ def _insert(user, resource, start, end, *, title, purpose="", on_behalf_of="", a
     Insert booking + ledger slot inside a savepoint. Raises SlotConflict if PostgreSQL refuses.
     Callers must already be inside transaction.atomic().
     """
-    from apps.approvals.services import attach_workflow, resolve_workflow
+    from apps.approvals.services import attach_class_signoff, attach_workflow, resolve_workflow
 
     workflow = resolve_workflow(resource, user)
+    class_signoff = not workflow and user.role == Role.STUDENT and bool(on_behalf_of.strip())
     for attempt in range(DEADLOCK_RETRIES):
         try:
-            booking = _claim(user, resource, start, end, workflow, title=title, purpose=purpose,
+            booking = _claim(user, resource, start, end, workflow or class_signoff, title=title, purpose=purpose,
                              on_behalf_of=on_behalf_of, attendees=attendees, recurrence=recurrence, index=index)
             break
         except OperationalError as exc:
@@ -85,10 +87,12 @@ def _insert(user, resource, start, end, *, title, purpose="", on_behalf_of="", a
             time.sleep(random.uniform(0, min(0.4, 0.01 * 2**attempt)))
     if workflow:
         attach_workflow(booking, workflow)
+    elif class_signoff:
+        attach_class_signoff(booking)
     return booking
 
 
-def _claim(user, resource, start, end, workflow, *, title, purpose, on_behalf_of, attendees, recurrence, index):
+def _claim(user, resource, start, end, needs_approval, *, title, purpose, on_behalf_of, attendees, recurrence, index):
     try:
         with transaction.atomic():
             booking = Booking.objects.create(
@@ -99,7 +103,7 @@ def _claim(user, resource, start, end, workflow, *, title, purpose, on_behalf_of
                 on_behalf_of=on_behalf_of,
                 attendees=attendees,
                 period=tsrange(start, end),
-                status=Booking.Status.PENDING if workflow else Booking.Status.CONFIRMED,
+                status=Booking.Status.PENDING if needs_approval else Booking.Status.CONFIRMED,
                 recurrence=recurrence,
                 occurrence_index=index,
             )
@@ -238,8 +242,32 @@ def create_recurring(
 # ---------------------------------------------------------------- lifecycle
 
 
+def _tell_watchers(booking):
+    """The slot just opened up: tell everyone who asked, once. First to book it wins, as with any booking."""
+    now = timezone.now()
+    if booking.end <= now:
+        return
+    watches = (
+        SlotWatch.objects.filter(resource=booking.resource, notified_at=None, start__lt=booking.end, end__gt=booking.start)
+        .exclude(user=booking.user)
+        .select_related("user")
+    )
+    for w in watches:
+        notify(
+            w.user,
+            Notification.Kind.INFO,
+            f"A slot just opened: {booking.resource.name}",
+            f"{timezone.localtime(booking.start):%a %d %b, %H:%M}–{timezone.localtime(booking.end):%H:%M} is free. "
+            "First to book it gets it.",
+            link=f"/resources/{booking.resource_id}",
+            email=False,
+        )
+    watches.update(notified_at=now)
+
+
 def _free_slot(booking):
     BookingSlot.objects.filter(booking=booking).delete()
+    _tell_watchers(booking)
 
 
 def set_status(booking, status, note=""):
@@ -382,14 +410,18 @@ def auto_release_sweep(now=None):
             if not locked:
                 continue
             set_status(locked, Booking.Status.RELEASED, f"Not checked in within {policy.grace_minutes} min")
-            NoShow.objects.get_or_create(booking=locked, defaults={"user": locked.user, "resource": locked.resource})
+            # Shared demo personas must stay bookable however long the app runs unattended.
+            strike = not (settings.DEBUG and locked.user.username.startswith("demo."))
+            if strike:
+                NoShow.objects.get_or_create(booking=locked, defaults={"user": locked.user, "resource": locked.resource})
             notify(
                 locked.user, Notification.Kind.RELEASED, f"Released: {locked.resource.name}",
                 f"You didn't check in by {timezone.localtime(locked.start + timedelta(minutes=policy.grace_minutes)):%H:%M}, "
                 "so the slot was released for others.",
                 booking=locked, link=f"/bookings/{locked.id}",
             )
-            apply_noshow_restriction(locked.user, policy)
+            if strike:
+                apply_noshow_restriction(locked.user, policy)
             released += 1
 
     # Pending requests nobody decided before the start time expire.

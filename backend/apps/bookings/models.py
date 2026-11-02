@@ -168,3 +168,17 @@ class NoShow(models.Model):
 
     class Meta:
         ordering = ["-recorded_at"]
+
+
+class SlotWatch(models.Model):
+    """"Tell me if this frees up": a place on the waitlist for a slot someone else holds."""
+
+    resource = models.ForeignKey("catalogue.Resource", on_delete=models.CASCADE, related_name="watches")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="slot_watches")
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [("resource", "user", "start", "end")]

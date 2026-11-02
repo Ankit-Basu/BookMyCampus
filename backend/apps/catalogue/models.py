@@ -50,6 +50,7 @@ class Resource(models.Model):
         DOWN = "down", "Out of service"
         RETIRED = "retired", "Retired"
 
+    saved_by = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="saved_resources")
     type = models.ForeignKey(ResourceType, on_delete=models.PROTECT, related_name="resources")
     code = models.CharField(max_length=32, unique=True)
     name = models.CharField(max_length=160)

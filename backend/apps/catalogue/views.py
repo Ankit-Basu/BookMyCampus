@@ -13,13 +13,15 @@ from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.models import Department
 from apps.accounts.permissions import IsManager, ReadOnlyOrManager, ReadOnlyOrPolicyAdmin
 from apps.approvals.models import ApprovalWorkflow
-from apps.bookings.models import BookingSlot
-from apps.rules.services import availability
+from apps.bookings.exceptions import BookingError
+from apps.bookings.models import BookingSlot, SlotWatch
+from apps.rules.services import availability, validate_request
 
 from .models import Location, Resource, ResourceImage, ResourceType
 from .serializers import (
@@ -56,7 +58,8 @@ class ResourceViewSet(viewsets.ModelViewSet):
     """
     Catalogue with faceted search. Extra query params:
       q, type (slug or id, comma list), department, building, min_capacity, features (comma list),
-      free_from + free_to → only resources with nothing in the occupancy ledger over that window.
+      free_from + free_to → only resources with nothing in the occupancy ledger over that window,
+      saved=1 → only the rooms the signed-in user has saved.
     """
 
     permission_classes = [ReadOnlyOrManager]
@@ -73,6 +76,8 @@ class ResourceViewSet(viewsets.ModelViewSet):
             .filter(Q(requester_roles=[]) | Q(requester_roles__contains=[role]))
             .values_list("resource_type_id", flat=True)
         )
+        if self.request.user.is_authenticated:
+            ctx["saved_ids"] = set(self.request.user.saved_resources.values_list("id", flat=True))
         return ctx
 
     def get_queryset(self):
@@ -101,6 +106,8 @@ class ResourceViewSet(viewsets.ModelViewSet):
             qs = qs.filter(features__contains=f.split(","))
         if p.get("mine") == "1":
             qs = qs.filter(custodians=self.request.user)
+        if p.get("saved") == "1":
+            qs = qs.filter(saved_by=self.request.user)
         ff, ft = p.get("free_from"), p.get("free_to")
         if ff and ft:
             s, e = parse_datetime(ff), parse_datetime(ft)
@@ -108,6 +115,95 @@ class ResourceViewSet(viewsets.ModelViewSet):
                 busy = BookingSlot.objects.filter(period__overlap=(s, e)).values("resource_id")
                 qs = qs.exclude(id__in=busy).filter(status=Resource.Status.ACTIVE)
         return qs.order_by("type__name", "name")
+
+    @action(detail=True, methods=["post", "delete"], url_path="saved", permission_classes=[IsAuthenticated])
+    def saved(self, request, pk=None):
+        """Any signed-in user can save a room for themselves. Repeating either call changes nothing."""
+        resource = self.get_object()
+        if request.method == "POST":
+            request.user.saved_resources.add(resource)
+        else:
+            request.user.saved_resources.remove(resource)
+        return Response({"is_saved": request.method == "POST"})
+
+    def _requested_slot(self, data):
+        start, end = parse_datetime(str(data.get("start", ""))), parse_datetime(str(data.get("end", "")))
+        if not start or not end or end <= start:
+            raise BookingError("bad_slot", "That isn't a valid time range.")
+        return start, end
+
+    @action(detail=True, methods=["get"], url_path="alternatives", permission_classes=[IsAuthenticated])
+    def alternatives(self, request, pk=None):
+        """A slot is taken, so: similar rooms the asker could book for that exact time, and the next free time here."""
+        resource = self.get_object()
+        start, end = self._requested_slot(request.query_params)
+        busy = BookingSlot.objects.filter(period__overlap=(start, end)).values("resource_id")
+        candidates = (
+            Resource.objects.filter(type_id=resource.type_id, status=Resource.Status.ACTIVE)
+            .exclude(id=resource.id)
+            .exclude(id__in=busy)
+            .select_related("type", "department", "location")
+            .prefetch_related("images")
+        )
+        same_building = resource.location.building if resource.location else None
+        ranked = sorted(candidates, key=lambda r: (r.location is None or r.location.building != same_building, abs(r.capacity - resource.capacity)))
+        rooms = []
+        for r in ranked:
+            try:
+                validate_request(request.user, r, start, end, 1, check_quota=False)
+            except BookingError:
+                continue
+            rooms.append(r)
+            if len(rooms) == 4:
+                break
+        day = timezone.localtime(max(start, timezone.now())).date()
+        slots = availability(resource, day, day + timedelta(days=7), request.user)["free"]
+        next_free = next((s["start"] for s in slots if s["start"] >= max(start, timezone.now())), None)
+        return Response({
+            "rooms": ResourceListSerializer(rooms, many=True, context=self.get_serializer_context()).data,
+            "next_free": next_free,
+        })
+
+    @action(detail=True, methods=["post"], url_path="watch", permission_classes=[IsAuthenticated])
+    def watch(self, request, pk=None):
+        """Join the waitlist for a slot held by someone else's booking. Repeating it changes nothing."""
+        resource = self.get_object()
+        start, end = self._requested_slot(request.data)
+        if start <= timezone.now():
+            raise BookingError("slot_passed", "That time has already passed.")
+        held = BookingSlot.objects.filter(
+            resource=resource, kind=BookingSlot.Kind.BOOKING, period__overlap=(start, end)
+        ).exclude(booking__user=request.user)
+        if not held.exists():
+            raise BookingError("not_held", "Nobody else has booked that time, so there's nothing to wait for.")
+        SlotWatch.objects.get_or_create(resource=resource, user=request.user, start=start, end=end)
+        return Response({"watching": True}, status=201)
+
+    @action(detail=True, methods=["get"], url_path="insights", permission_classes=[IsAuthenticated])
+    def insights(self, request, pk=None):
+        """How often each opening hour was taken over the last four weeks, so people can pick a quiet time."""
+        resource = self.get_object()
+        now = timezone.now()
+        since = now - timedelta(days=28)
+        today = timezone.localtime(now).date()
+        rules = availability(resource, today, today + timedelta(days=1), request.user)["rules"]
+        if not rules:
+            return Response({"hours": [], "quietest": None})
+        open_days = {w for r in rules for w in r["weekdays"]}
+        days = sum((today - timedelta(days=i)).weekday() in open_days for i in range(1, 29)) or 1
+        first, last = min(int(r["open"][:2]) for r in rules), max(int(r["close"][:2]) for r in rules)
+        taken = set()
+        for period in BookingSlot.objects.filter(resource=resource, period__overlap=(since, now)).values_list("period", flat=True):
+            cur = timezone.localtime(max(period.lower, since)).replace(minute=0, second=0, microsecond=0)
+            end = timezone.localtime(min(period.upper, now))
+            while cur < end:
+                taken.add((cur.date(), cur.hour))
+                cur += timedelta(hours=1)
+        hours = [
+            {"hour": h, "busy": round(sum(1 for _, x in taken if x == h) / days, 2)} for h in range(first, last)
+        ]
+        quietest = min(hours, key=lambda x: x["busy"])["hour"] if taken and hours else None
+        return Response({"hours": hours, "quietest": quietest})
 
     @action(detail=False)
     def facets(self, request):

@@ -165,9 +165,9 @@ class Command(BaseCommand):
     def catalogue(self):
         T = {}
         types = [
-            ("Classroom", "chalkboard", "#F5B544", "Lecture rooms with projection — faculty book freely, students need custodian approval.", [], False),
+            ("Classroom", "chalkboard", "#F5B544", "Lecture rooms with projection — faculty book freely, students need HOD approval.", [], False),
             ("Laboratory", "flask", "#3EE6C1", "Teaching and research labs.", [], True),
-            ("Equipment", "microscope", "#8B7CFF", "High-value instruments and lendable kit. Custodian approval required.", [], True),
+            ("Equipment", "microscope", "#8B7CFF", "High-value instruments and lendable kit. HOD approval required.", [], True),
             ("Seminar Hall", "presentation", "#FF7A59", "Halls and auditoria for events, talks and defences.", [Role.FACULTY, Role.STAFF, Role.CUSTODIAN, Role.DEPT_HEAD, Role.FACILITY_MANAGER, Role.ADMIN], True),
             ("Sports Facility", "basketball", "#5FD068", "Courts, turf and fitness spaces.", [], True),
             ("Meeting Room", "users-three", "#5AB2FF", "Bookable rooms for group work and meetings.", [], True),
@@ -300,10 +300,10 @@ class Command(BaseCommand):
             for i, (n, r) in enumerate(steps, start=1):
                 ApprovalStep.objects.create(workflow=w, order=i, name=n, approver_role=r, sla_hours=24)
 
-        wf("Equipment — custodian sign-off", "Equipment", [], [("Custodian check", Role.CUSTODIAN)])
-        wf("Students in classrooms", "Classroom", [Role.STUDENT], [("Custodian check", Role.CUSTODIAN)])
-        wf("Seminar hall events", "Seminar Hall", [], [("Department head", Role.DEPT_HEAD), ("Facility manager", Role.FACILITY_MANAGER)])
-        wf("Vehicle requisition", "Vehicle", [], [("Department head", Role.DEPT_HEAD), ("Transport desk", Role.FACILITY_MANAGER)])
+        wf("Equipment — HOD sign-off", "Equipment", [], [("HOD approval", Role.DEPT_HEAD)])
+        wf("Students in classrooms", "Classroom", [Role.STUDENT], [("HOD approval", Role.DEPT_HEAD)])
+        wf("Seminar hall events", "Seminar Hall", [], [("HOD approval", Role.DEPT_HEAD)])
+        wf("Vehicle requisition", "Vehicle", [], [("HOD approval", Role.DEPT_HEAD)])
         wf("Student lab access", "Laboratory", [Role.STUDENT], [("Lab custodian", Role.CUSTODIAN)])
 
     # ------------------------------------------------------------------ consumables

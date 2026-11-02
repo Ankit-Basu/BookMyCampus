@@ -218,3 +218,35 @@ LAB-BAD,Broken Lab,NonExistentType,CSE,Block 34,1,102,10,AC,100000,,Bad
         self.assertEqual(r.data["created"], 1)
         self.assertEqual(len(r.data["errors"]), 1)
         self.assertEqual(r.data["errors"][0]["row"], 3)
+
+
+class SavedRoomsTest(APITestCase):
+    def setUp(self):
+        rtype = ResourceType.objects.create(name="Laboratory", color="#FF0000")
+        self.room = Resource.objects.create(code="LAB-1", name="Lab One", type=rtype, capacity=10)
+        self.other = Resource.objects.create(code="LAB-2", name="Lab Two", type=rtype, capacity=10)
+        self.student = User.objects.create_user(username="stu", password="pw", role=Role.STUDENT)
+        self.friend = User.objects.create_user(username="fri", password="pw", role=Role.STUDENT)
+        self.client.force_authenticate(self.student)
+
+    def test_a_student_can_save_and_unsave_their_own_list(self):
+        self.assertEqual(self.client.post(f"/api/resources/{self.room.id}/saved").status_code, 200)
+        self.assertEqual(self.client.post(f"/api/resources/{self.room.id}/saved").status_code, 200)  # repeat is harmless
+
+        self.assertEqual([r["id"] for r in self.client.get("/api/resources?saved=1").data], [self.room.id])
+        self.assertTrue(self.client.get(f"/api/resources/{self.room.id}").data["is_saved"])
+        flags = {r["id"]: r["is_saved"] for r in self.client.get("/api/resources").data}
+        self.assertEqual(flags, {self.room.id: True, self.other.id: False})
+
+        self.client.force_authenticate(self.friend)
+        self.assertEqual(self.client.get("/api/resources?saved=1").data, [])
+        self.assertFalse(self.client.get(f"/api/resources/{self.room.id}").data["is_saved"])
+
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.delete(f"/api/resources/{self.room.id}/saved").status_code, 200)
+        self.assertEqual(self.client.get("/api/resources?saved=1").data, [])
+
+    def test_saving_needs_sign_in_and_does_not_open_up_editing(self):
+        self.assertEqual(self.client.delete(f"/api/resources/{self.room.id}").status_code, 403)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post(f"/api/resources/{self.room.id}/saved").status_code, 401)
