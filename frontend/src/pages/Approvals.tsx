@@ -61,6 +61,7 @@ function ApprovalCard({ item }: { item: QueueItem }) {
         <div className="row wrap muted" style={{ gap: 14, fontSize: 12.5, marginTop: 10 }}>
           <span>{item.user_name} · {item.requester_role}{item.requester_department ? ` · ${item.requester_department}` : ''}</span>
           <span className="row" style={{ gap: 4 }}><UsersThree size={13} /> {item.attendees}</span>
+          {item.on_behalf_of && <span className="tag" style={{ '--c': 'var(--info)' } as CSSProperties}>For class {item.on_behalf_of}</span>}
           {item.series_size && <span className="row" style={{ gap: 4 }}><Repeat size={13} /> part of a {item.series_size}-date series</span>}
           <span>waiting {fmtRelative(item.current_step.activated_at).replace(' ago', '')}</span>
         </div>
@@ -88,7 +89,7 @@ export default function Approvals() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Custodian desk"
+        eyebrow="HOD desk"
         title={<>Approval <em>queue</em></>}
         sub="Requests waiting on you. The slot is already held for the requester — approving confirms it, rejecting hands it back to everyone."
         actions={<span className="mono muted">{data?.length ?? 0} waiting</span>}

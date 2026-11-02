@@ -389,11 +389,11 @@ function FeatureBento({ stats }: { stats?: Stats }) {
           <small className="mono">2 strikes · pause at 3</small>
         </div>
       </Bento>
-      <Bento className="b-third" icon={Stamp} title="Approval chains you can edit" body="Custodian, HoD, facility manager: per type and role. Change the chain live, no redeploy.">
+      <Bento className="b-third" icon={Stamp} title="Approval chains you can edit" body="Requests go to the right HOD, set per resource type and role. Change the chain live, no redeploy.">
         <div className="mini-chain">
-          <span className="done">Custodian</span><i />
-          <span className="done">HoD</span><i />
-          <span className="live">Manager</span>
+          <span className="done">Student</span><i />
+          <span className="done">Request</span><i />
+          <span className="live">HOD</span>
           <div className="mini-stamp mono">Approved</div>
         </div>
       </Bento>
@@ -556,7 +556,7 @@ export default function Landing() {
               <h2 data-reveal className="display">Book it <em>before</em> someone else does.</h2>
               <div data-reveal>
                 <Link to={cta} className="key key-lg final-key">
-                  <ShinyText text={user ? 'Open BookMyCampus' : 'Sign in with your UMS ID'} color="var(--primary-foreground)" shineColor="#ffffff" speed={3} />
+                  <ShinyText text={user ? 'Open BookMyCampus' : 'Sign in or create an account'} color="var(--primary-foreground)" shineColor="#ffffff" speed={3} />
                   <ArrowRight weight="bold" />
                 </Link>
               </div>

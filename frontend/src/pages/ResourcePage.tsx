@@ -2,19 +2,7 @@ import type { DateSelectArg, EventInput } from '@fullcalendar/core'
 import interactionPlugin from '@fullcalendar/interaction'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import {
-  ArrowLeft,
-  CalendarPlus,
-  Clock,
-  MapPin,
-  Printer,
-  Repeat,
-  SealCheck,
-  Stamp,
-  UsersThree,
-  Warning,
-  Wrench,
-} from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, BellRinging, CalendarPlus, Clock, GraduationCap, MapPin, Printer, Repeat, SealCheck, Stamp, User, UsersThree, Warning, Wrench } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -23,12 +11,13 @@ import { toast } from 'sonner'
 
 import { Reveal } from '../components/motion'
 import DecryptedText from '../components/reactbits/DecryptedText'
-import { Drawer, Modal, Skeleton, TypeTag, Select } from '../components/ui'
-import { api, blobUrl, errorCode, errorDetails, errorMessage } from '../lib/api'
+import SaveButton from '../components/SaveButton'
+import { Drawer, Modal, Skeleton, TypeTag, Select, Empty } from '../components/ui'
+import { api, blobUrl, errorCode, errorDetails, errorMessage, retryUnlessMissing } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { durationLabel, inr, WEEKDAYS } from '../lib/format'
 import { initialWeek } from '../lib/preload'
-import type { Availability, Booking, ResourceDetail } from '../lib/types'
+import type { Availability, Booking, Resource, ResourceDetail } from '../lib/types'
 
 type Consumable = { id: number; name: string; kind: string; unit: string; stock: number }
 
@@ -47,6 +36,7 @@ function BookingDrawer({
   const [title, setTitle] = useState('')
   const [attendees, setAttendees] = useState(1)
   const [purpose, setPurpose] = useState('')
+  const [forClass, setForClass] = useState(false)
   const [onBehalf, setOnBehalf] = useState('')
   const [recurring, setRecurring] = useState(false)
   const [days, setDays] = useState<number[]>([])
@@ -77,7 +67,7 @@ function BookingDrawer({
           end: slot!.end.toISOString(),
           title: title || `${resource.name} booking`,
           purpose,
-          on_behalf_of: onBehalf,
+          on_behalf_of: forClass ? onBehalf.trim() : '',
           attendees,
           recurrence: recurring ? { freq: 'weekly', interval: 1, weekdays: days, count, conflict_policy: policy } : null,
           accessories: Object.entries(acc).filter(([, q]) => q > 0).map(([id, quantity]) => ({ id: Number(id), quantity })),
@@ -110,6 +100,7 @@ function BookingDrawer({
   })
 
   if (!slot) return <Drawer open={false} onClose={onClose} title="">{null}</Drawer>
+  const needsApproval = resource.requires_approval || (forClass && user?.role === 'student')
   return (
     <Drawer open={!!slot} onClose={onClose} title={result ? 'Series booked' : 'Reserve this slot'}>
       {result ? (
@@ -156,9 +147,13 @@ function BookingDrawer({
               <div className="eyebrow">{durationLabel(slot.start.toISOString(), slot.end.toISOString())}</div>
             </div>
           </div>
-          {resource.requires_approval && (
+          <div className="seg audience" role="group" aria-label="Who is this booking for">
+            <button type="button" className={forClass ? '' : 'on'} onClick={() => setForClass(false)}><User size={15} /> Just me</button>
+            <button type="button" className={forClass ? 'on' : ''} onClick={() => setForClass(true)}><GraduationCap size={15} /> For a class</button>
+          </div>
+          {needsApproval && (
             <div className="notice">
-              <Stamp size={18} color="var(--brand)" /> This needs approval. The slot is held for you the moment you submit.
+              <Stamp size={18} color="var(--brand)" /> {resource.requires_approval ? 'This needs approval.' : 'Class bookings go to your HOD.'} The slot is held for you the moment you submit.
             </div>
           )}
           <label className="field">
@@ -170,15 +165,15 @@ function BookingDrawer({
               <span>People (max {resource.capacity})</span>
               <input className="input" type="number" min={1} max={resource.capacity} value={attendees} onChange={(e) => setAttendees(Number(e.target.value))} />
             </label>
-            {user?.can_book_recurring && (
+            {forClass && (
               <label className="field">
-                <span>On behalf of class</span>
-                <input className="input" value={onBehalf} onChange={(e) => setOnBehalf(e.target.value)} placeholder="K22CS-B" />
+                <span>Class or section</span>
+                <input className="input" value={onBehalf} onChange={(e) => setOnBehalf(e.target.value)} placeholder="K22CS-B" maxLength={80} required />
               </label>
             )}
           </div>
           <label className="field">
-            <span>Notes for the custodian (optional)</span>
+            <span>Notes for the approver (optional)</span>
             <textarea className="input" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={2} />
           </label>
 
@@ -242,7 +237,7 @@ function BookingDrawer({
 
           <button className="key key-amber key-lg" disabled={book.isPending}>
             <CalendarPlus weight="bold" />
-            {book.isPending ? 'Claiming slot…' : resource.requires_approval ? 'Request booking' : recurring ? `Book ${count} weeks` : 'Confirm booking'}
+            {book.isPending ? 'Claiming slot…' : needsApproval ? 'Request booking' : recurring ? `Book ${count} weeks` : 'Confirm booking'}
           </button>
           <p className="muted" style={{ fontSize: 12, margin: 0, textAlign: 'center' }}>
             {resource.requires_checkin ? 'Scan the room QR within the grace period after start, or the slot auto-releases.' : 'No check-in needed for this resource.'}
@@ -250,6 +245,96 @@ function BookingDrawer({
         </form>
       )}
     </Drawer>
+  )
+}
+
+type Taken = { kind: string; label: string; start: Date; end: Date }
+type Alternatives = { rooms: Resource[]; next_free: string | null }
+
+/** Clicking a slot that's taken: never a dead end. Offers the waitlist, the same time elsewhere, and the next free time here. */
+function TakenDrawer({ taken, resource, onClose }: { taken: Taken | null; resource: ResourceDetail; onClose: () => void }) {
+  const start = taken?.start.toISOString()
+  const end = taken?.end.toISOString()
+  const future = !!taken && taken.start > new Date()
+  const { data } = useQuery({
+    queryKey: ['alternatives', resource.id, start, end],
+    queryFn: () => api.get<Alternatives>(`/resources/${resource.id}/alternatives`, { params: { start, end } }).then((r) => r.data),
+    enabled: future,
+  })
+  const watch = useMutation({
+    mutationFn: () => api.post(`/resources/${resource.id}/watch`, { start, end }),
+    onSuccess: () => toast.success('You’re on the waitlist', { description: 'We’ll notify you the moment this slot opens up.' }),
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  useEffect(() => watch.reset(), [start]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!taken) return <Drawer open={false} onClose={onClose} title="">{null}</Drawer>
+  const heading = taken.kind === 'timetable' ? `Class on: ${taken.label}` : taken.kind === 'maintenance' ? `Maintenance: ${taken.label}` : 'Someone has this slot'
+  return (
+    <Drawer open onClose={onClose} title="This slot is taken">
+      <div className="col" style={{ gap: 16 }}>
+        <div className="slot-summary">
+          <div className="grow" style={{ minWidth: 0 }}>
+            <div className="eyebrow">{format(taken.start, 'EEEE d MMMM')}</div>
+            <div className="h2" style={{ marginTop: 4 }}>{heading}</div>
+          </div>
+          <div className="mono" style={{ fontSize: 18, color: 'var(--brand-ink)', whiteSpace: 'nowrap' }}>{format(taken.start, 'HH:mm')}–{format(taken.end, 'HH:mm')}</div>
+        </div>
+        {!future && <p className="muted" style={{ margin: 0 }}>This time has already passed.</p>}
+        {future && taken.kind === 'booking' && (
+          <button className="key key-amber" disabled={watch.isPending || watch.isSuccess} onClick={() => watch.mutate()}>
+            <BellRinging weight="bold" /> {watch.isSuccess ? 'On the waitlist' : 'Tell me if it frees up'}
+          </button>
+        )}
+        {data?.next_free && <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>Next free time in {resource.name}: <strong>{format(new Date(data.next_free), 'EEE d MMM, HH:mm')}</strong></p>}
+        {future && (
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>Free at this exact time</div>
+            {data && !data.rooms.length && <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>Nothing similar is free then. Try another time.</p>}
+            <div className="col" style={{ gap: 8 }}>
+              {data?.rooms.map((a) => (
+                <Link key={a.id} to={`/resources/${a.id}`} className="alt-room" onClick={onClose}>
+                  {a.cover ? <img src={a.cover.replace('w=1200', 'w=160')} alt="" /> : <span className="stripes" />}
+                  <span className="grow" style={{ minWidth: 0 }}>
+                    <strong className="truncate">{a.name}</strong>
+                    <small className="truncate">{a.location_label}</small>
+                    <small><UsersThree size={12} /> {a.capacity}{a.requires_approval ? ' · needs approval' : ' · instant'}</small>
+                  </span>
+                  <ArrowRight size={15} />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Drawer>
+  )
+}
+
+/** Four weeks of real usage, hour by hour, so people can aim for a quiet time. */
+function BestTimes({ id }: { id: number }) {
+  const { data } = useQuery({
+    queryKey: ['insights', id],
+    queryFn: () => api.get<{ hours: { hour: number; busy: number }[]; quietest: number | null }>(`/resources/${id}/insights`).then((r) => r.data),
+    staleTime: 300_000,
+  })
+  if (!data?.hours.length) return null
+  const peak = Math.max(...data.hours.map((h) => h.busy), 0.01)
+  const hh = (h: number) => `${String(h).padStart(2, '0')}:00`
+  return (
+    <Reveal className="glass pad">
+      <div className="eyebrow" style={{ marginBottom: 6 }}>Best time to book</div>
+      <p style={{ margin: '0 0 14px', fontSize: 14 }}>
+        {data.quietest === null ? 'No bookings in the last four weeks. Take your pick.' : <>Usually quietest around <strong>{hh(data.quietest)}</strong>.</>}
+      </p>
+      <div className="hour-bars" role="img" aria-label={`How busy each hour was over the last four weeks, quietest around ${data.quietest === null ? 'any time' : hh(data.quietest)}`}>
+        {data.hours.map((h) => (
+          <span key={h.hour} className={h.hour === data.quietest ? 'quiet' : ''} title={`${hh(h.hour)}: taken ${Math.round(h.busy * 100)}% of days`}>
+            <i style={{ height: `${Math.max(6, (h.busy / peak) * 100)}%` }} />
+          </span>
+        ))}
+      </div>
+      <div className="hour-axis mono"><span>{hh(data.hours[0].hour)}</span><span>{hh(data.hours[data.hours.length - 1].hour)}</span></div>
+    </Reveal>
   )
 }
 
@@ -262,12 +347,13 @@ export default function ResourcePage() {
   // Same first week FullCalendar opens on, so the hover-prefetch from Explore is a cache hit.
   const [range, setRange] = useState(initialWeek)
   const [slot, setSlot] = useState<{ start: Date; end: Date } | null>(null)
+  const [taken, setTaken] = useState<Taken | null>(null)
   const [img, setImg] = useState(0)
   const [report, setReport] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 760
 
-  const { data: r } = useQuery({ queryKey: ['resource', id], queryFn: () => api.get<ResourceDetail>(`/resources/${id}`).then((x) => x.data) })
+  const { data: r, isError } = useQuery({ queryKey: ['resource', id], queryFn: () => api.get<ResourceDetail>(`/resources/${id}`).then((x) => x.data), retry: retryUnlessMissing })
   const { data: av, isFetching } = useQuery({
     queryKey: ['availability', Number(id), range.from, range.to],
     queryFn: () => api.get<Availability>(`/resources/${id}/availability`, { params: range }).then((x) => x.data),
@@ -284,7 +370,8 @@ export default function ResourcePage() {
       classNames: [`ev-${b.kind}`, b.mine ? 'ev-mine' : '', b.status === 'pending' ? 'ev-pending' : ''],
       overlap: false,
       editable: false,
-      url: b.mine && b.booking_id ? `/bookings/${b.booking_id}` : undefined,
+      // Not FullCalendar's `url`: it renders `undefined` as a real href, and the click leaves the app.
+      extendedProps: { kind: b.kind, label: b.label, link: b.mine && b.booking_id ? `/bookings/${b.booking_id}` : null },
     }))
     av.blackouts.forEach((b, i) => ev.push({ id: `x${i}`, start: b.start, end: b.end, display: 'background', classNames: ['ev-blackout'], title: b.title, overlap: false }))
     return ev
@@ -352,6 +439,15 @@ export default function ResourcePage() {
     onError: (e) => toast.error(errorMessage(e)),
   })
 
+  if (isError && !r) {
+    return (
+      <div className="page">
+        <Empty title="We can’t find that room.">
+          <Link to="/explore" className="key key-amber" style={{ marginTop: 14 }}>Back to the catalogue</Link>
+        </Empty>
+      </div>
+    )
+  }
   if (!r) return <div className="page"><Skeleton h={420} /></div>
   const gallery = r.images.length ? r.images.map((i) => i.src) : [r.cover]
   const isCustodian = user?.custodian_of.includes(r.id) || user?.role === 'facility_manager' || user?.role === 'admin'
@@ -386,6 +482,7 @@ export default function ResourcePage() {
               </span>
             </div>
             <div className="rhero-actions">
+              <SaveButton key={String(r.is_saved)} id={r.id} saved={r.is_saved} labelled />
               <button className="key key-coral key-sm" onClick={() => setReport(true)}>
                 <Warning size={15} weight="bold" /> Report breakdown
               </button>
@@ -477,10 +574,16 @@ export default function ResourcePage() {
               events={events}
               select={onSelect}
               eventClick={(info) => {
-                if (info.event.url) {
-                  info.jsEvent.preventDefault()
-                  nav(info.event.url)
-                }
+                const { link, kind, label } = info.event.extendedProps
+                if (link) nav(link)
+                else if (kind) setTaken({ kind, label, start: info.event.start!, end: info.event.end! })
+              }}
+              dateClick={(info) => {
+                if (info.date < new Date()) return
+                const day = (info.date.getDay() + 6) % 7
+                const time = format(info.date, 'HH:mm')
+                const open = av?.rules.some((r) => r.weekdays.includes(day) && r.open.slice(0, 5) <= time && time < r.close.slice(0, 5))
+                if (!open) toast.info('Closed at that time', { description: 'Pick a time inside the white opening hours.' })
               }}
               datesSet={(d) => setRange({ from: format(d.start, 'yyyy-MM-dd'), to: format(d.end, 'yyyy-MM-dd') })}
               eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
@@ -493,6 +596,7 @@ export default function ResourcePage() {
         </Reveal>
 
         <aside className="col" style={{ gap: 18 }}>
+          <BestTimes id={r.id} />
           <Reveal className="glass pad">
             <div className="eyebrow" style={{ marginBottom: 10 }}>About</div>
             <p style={{ margin: '0 0 14px', color: 'var(--fg-2)' }}>{r.description}</p>
@@ -562,6 +666,7 @@ export default function ResourcePage() {
         </aside>
       </div>
 
+      <TakenDrawer taken={taken} resource={r} onClose={() => setTaken(null)} />
       <BookingDrawer resource={r} slot={slot} onClose={() => setSlot(null)} />
 
       <Modal open={maintOpen} onClose={() => setMaintOpen(false)} width={500}>
