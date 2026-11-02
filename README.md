@@ -49,15 +49,15 @@ npm run demo                         # optimised production build on :5173 — u
 
 The login screen has one-click buttons for each.
 
+Students create their own account at `/register` with their 8-digit registration number, then sign in with it. Sign-up always creates a Student; other roles are assigned by an administrator.
+
 | UMS ID | Role | Try this |
 |---|---|---|
-| `demo.student` | Student · CSE | Has a booking that's live **right now**: open *My bookings* and check in from *Scan* |
-| `demo.faculty` | Faculty · CSE | Recurring weekly booking; book on behalf of a class (K22CS-B) |
-| `demo.staff` | Staff · ECE | Laboratory asset issuance, equipment maintenance, bookings |
-| `demo.custodian` | Custodian | Approval queue, check-in posters, maintenance, consumables |
-| `demo.head` | Head of Dept · CSE | Seminar-hall approvals, department utilisation |
-| `demo.manager` | Facility Manager | Control room: analytics, policy, workflows, timetable |
-| `demo.admin` | Administrator | Everything, plus Django admin at `/django-admin/` |
+| `demo.student` | Student · CSE | Book for yourself, or "For a class" which goes to the HOD; check in from *Scan* |
+| `demo.faculty` | Faculty · CSE | Book labs and rooms, repeat weekly for a class |
+| `demo.head` | HOD · CSE | Approve requests from your department or for its rooms, add rooms, see usage |
+
+Facility manager and administrator accounts (`demo.manager`, `demo.admin`) still exist for campus-wide setup, but are not on the login screen.
 
 ---
 
