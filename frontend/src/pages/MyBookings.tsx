@@ -1,6 +1,6 @@
 import { CalendarBlank, CopySimple, QrCode } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -11,13 +11,16 @@ import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import type { Booking } from '../lib/types'
 
+const MyCalendar = lazy(() => import('../components/MyCalendar'))
+
 export default function MyBookings() {
   const { user } = useAuth()
-  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming')
+  const [tab, setTab] = useState<'upcoming' | 'past' | 'calendar'>('upcoming')
   const { data, isLoading } = useQuery({
     queryKey: ['bookings', tab],
     queryFn: () => api.get<Booking[]>('/bookings', { params: tab === 'upcoming' ? { upcoming: 1 } : { past: 1 } }).then((r) => r.data),
     refetchInterval: 30000,
+    enabled: tab !== 'calendar',
   })
   const feed = `${window.location.origin}/api/calendar/${user?.calendar_token}.ics`
 
@@ -26,7 +29,7 @@ export default function MyBookings() {
       <PageHeader
         eyebrow="Your passes"
         title={<>My <em>bookings</em></>}
-        sub="Every pass carries a QR. Scan the poster at the door when you arrive — or show this to the custodian."
+        sub="Every pass carries a QR. Scan the poster at the door when you arrive — or show this to the lab in-charge."
         actions={
           <>
             <Link to="/scan" className="key key-mint">
@@ -45,13 +48,15 @@ export default function MyBookings() {
         }
       />
       <div className="seg" style={{ marginBottom: 22 }}>
-        {(['upcoming', 'past'] as const).map((t) => (
+        {(['upcoming', 'calendar', 'past'] as const).map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-            {t === 'upcoming' ? 'Upcoming' : 'History'}
+            {t === 'upcoming' ? 'Upcoming' : t === 'calendar' ? 'My calendar' : 'History'}
           </button>
         ))}
       </div>
-      {isLoading ? (
+      {tab === 'calendar' ? (
+        <Suspense fallback={<Skeleton h={520} />}><MyCalendar /></Suspense>
+      ) : isLoading ? (
         <div className="ticket-grid">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} h={190} />)}</div>
       ) : data?.length ? (
         <Reveal className="ticket-grid" stagger={0.06}>

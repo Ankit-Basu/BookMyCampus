@@ -1,16 +1,17 @@
-import { Buildings, Lightning, MagnifyingGlass, SealCheck, Stamp, UsersThree } from '@phosphor-icons/react'
+import { ArrowRight, BookmarkSimple, Buildings, Lightning, MagnifyingGlass, SealCheck, Stamp, UsersThree } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { addHours, startOfHour } from 'date-fns'
+import { addHours, startOfHour, format, isToday, isTomorrow } from 'date-fns'
 import { memo, useDeferredValue, useMemo, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { Reveal, Tilt } from '../components/motion'
 import GlareHover from '../components/reactbits/GlareHover'
+import SaveButton from '../components/SaveButton'
 import { Empty, PageHeader, Skeleton, TypeIcon, Select } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { prefetchResource } from '../lib/preload'
-import type { Resource } from '../lib/types'
+import type { Booking, Resource } from '../lib/types'
 
 type Facets = {
   types: { type__id: number; type__name: string; type__slug: string; type__color: string; type__icon: string; n: number }[]
@@ -18,6 +19,28 @@ type Facets = {
   buildings: { location__building: string; n: number }[]
   features: { name: string; n: number }[]
   max_capacity: number
+}
+
+/** The student's very next booking, always one tap from the page they land on. */
+function NextUp() {
+  const { data } = useQuery({
+    queryKey: ['bookings', 'upcoming'],
+    queryFn: () => api.get<Booking[]>('/bookings', { params: { upcoming: 1 } }).then((r) => r.data),
+    refetchInterval: 30000,
+  })
+  const b = data?.length ? [...data].sort((x, y) => x.start.localeCompare(y.start))[0] : null
+  if (!b) return null
+  const start = new Date(b.start)
+  const day = isToday(start) ? 'Today' : isTomorrow(start) ? 'Tomorrow' : format(start, 'EEE d MMM')
+  return (
+    <Link to={`/bookings/${b.id}`} className="next-up">
+      <span className="eyebrow">Next up</span>
+      <strong className="truncate">{b.title}</strong>
+      <span className="muted truncate">{b.resource_name}</span>
+      <span className="mono next-up-when">{day} · {format(start, 'HH:mm')}</span>
+      <ArrowRight size={15} />
+    </Link>
+  )
 }
 
 /** Memoised: filtering re-renders the grid, but unchanged cards skip reconciliation entirely. */
@@ -34,6 +57,7 @@ export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Re
             <div className="rcard-inner">
               <div className="rcard-img">
                 {r.cover ? <img src={r.cover.replace('w=1200', 'w=480')} srcSet={`${r.cover.replace('w=1200', 'w=480')} 1x, ${r.cover.replace('w=1200', 'w=800')} 2x`} alt="" loading="lazy" decoding="async" /> : <div className="stripes" style={{ height: '100%' }} />}
+                <SaveButton id={r.id} saved={r.is_saved} />
                 <span className="rcard-type">
                   <TypeIcon icon={r.type_icon} size={14} /> {r.type_name}
                 </span>
@@ -76,6 +100,7 @@ export default function Explore() {
   const building = params.get('building') ?? ''
   const minCap = Number(params.get('min_capacity') ?? 0)
   const freeNow = params.get('free') === '1'
+  const savedOnly = params.get('saved') === '1'
 
   const set = (k: string, v: string | null) => {
     const p = new URLSearchParams(params)
@@ -95,7 +120,7 @@ export default function Explore() {
 
   const { data: facets } = useQuery({ queryKey: ['facets'], queryFn: () => api.get<Facets>('/resources/facets').then((r) => r.data) })
   const { data, isLoading } = useQuery({
-    queryKey: ['resources', dq, types.join(','), building, minCap, freeNow],
+    queryKey: ['resources', dq, types.join(','), building, minCap, freeNow, savedOnly],
     queryFn: () =>
       api
         .get<Resource[]>('/resources', {
@@ -106,6 +131,7 @@ export default function Explore() {
             min_capacity: minCap || undefined,
             free_from: freeNow ? window_.from : undefined,
             free_to: freeNow ? window_.to : undefined,
+            saved: savedOnly ? 1 : undefined,
           },
         })
         .then((r) => r.data),
@@ -122,6 +148,8 @@ export default function Explore() {
         title={<>What do you need <em>today?</em></>}
         sub="Rooms, labs, instruments, halls, courts and vehicles across LPU — live availability, timetable-aware."
       />
+
+      <NextUp />
 
       <Reveal>
         <div className="glass search-bar" data-reveal>
@@ -141,8 +169,11 @@ export default function Explore() {
         </div>
 
         <div className="facet-row" data-reveal>
-          <button className={`chip ${types.length === 0 ? 'on' : ''}`} onClick={() => set('type', null)}>
+          <button className={`chip ${types.length === 0 && !savedOnly ? 'on' : ''}`} onClick={() => { const p = new URLSearchParams(params); p.delete('type'); p.delete('saved'); setParams(p, { replace: true }) }}>
             All
+          </button>
+          <button className={`chip ${savedOnly ? 'on' : ''}`} onClick={() => set('saved', savedOnly ? null : '1')}>
+            <BookmarkSimple size={15} weight={savedOnly ? 'fill' : 'regular'} /> Saved
           </button>
           {facets?.types.map((t) => (
             <button
@@ -198,7 +229,7 @@ export default function Explore() {
           ))}
         </div>
       ) : (
-        <Empty title="Nothing matches that.">Loosen a filter — or turn off “free this hour”.</Empty>
+        <Empty title={savedOnly ? 'Nothing saved yet.' : 'Nothing matches that.'}>{savedOnly ? 'Tap the bookmark on any room to keep it here.' : 'Loosen a filter — or turn off “free this hour”.'}</Empty>
       )}
     </div>
   )

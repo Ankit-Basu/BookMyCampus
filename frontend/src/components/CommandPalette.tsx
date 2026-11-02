@@ -28,7 +28,8 @@ export default function CommandPalette({ open, onOpenChange, links }: { open: bo
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement
-      const typing = el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)
+      const emptySearch = el.classList.contains('search-input') && !(el as HTMLInputElement).value
+      const typing = !emptySearch && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
       if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
         onOpenChange(true)

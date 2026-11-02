@@ -67,6 +67,9 @@ api.interceptors.response.use(
 export type ApiError = { error?: string; message?: string; detail?: string; details?: Record<string, unknown> }
 
 /** Human message out of any API error shape (domain errors, DRF validation, network). */
+/** A missing or forbidden record will not appear on a retry, so say so straight away. */
+export const retryUnlessMissing = (count: number, e: unknown) => ![403, 404].includes((e as AxiosError)?.response?.status ?? 0) && count < 2
+
 export function errorMessage(e: unknown): string {
   const ax = e as AxiosError<ApiError | Record<string, string[]>>
   const d = ax?.response?.data as ApiError & Record<string, unknown>

@@ -13,7 +13,7 @@
   align-items: center;
   gap: 10px;
   border-radius: 22px;
-  background: color-mix(in oklab, var(--popover) 84%, transparent);
+  background: color-mix(in oklab, var(--popover) 96%, transparent);
 }
 .wordmark {
   display: inline-flex;

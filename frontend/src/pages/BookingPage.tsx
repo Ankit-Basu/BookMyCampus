@@ -7,8 +7,8 @@ import { toast } from 'sonner'
 
 import { BookingQR, mmss, useCheckinWindow } from '../components/BookingTicket'
 import { Reveal } from '../components/motion'
-import { Skeleton, StatusTag } from '../components/ui'
-import { api, download, errorMessage } from '../lib/api'
+import { Skeleton, StatusTag, Empty } from '../components/ui'
+import { api, download, errorMessage, retryUnlessMissing } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { durationLabel, fmtRelative, ROLE_LABEL } from '../lib/format'
 import type { Booking } from '../lib/types'
@@ -50,7 +50,7 @@ export default function BookingPage() {
   const { user } = useAuth()
   const qc = useQueryClient()
   const nav = useNavigate()
-  const { data: b } = useQuery({ queryKey: ['booking', id], queryFn: () => api.get<Booking>(`/bookings/${id}`).then((r) => r.data), refetchInterval: 20000 })
+  const { data: b, isError } = useQuery({ retry: retryUnlessMissing, queryKey: ['booking', id], queryFn: () => api.get<Booking>(`/bookings/${id}`).then((r) => r.data), refetchInterval: 20000 })
 
   const act = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: object }) => api.post(`/bookings/${id}/${path}`, body ?? {}).then((r) => r.data),
@@ -62,6 +62,15 @@ export default function BookingPage() {
     onError: (e) => toast.error(errorMessage(e)),
   })
 
+  if (isError && !b) {
+    return (
+      <div className="page">
+        <Empty title="We can’t find that booking.">
+          <Link to="/bookings" className="key key-amber" style={{ marginTop: 14 }}>Back to my bookings</Link>
+        </Empty>
+      </div>
+    )
+  }
   if (!b) return <div className="page"><Skeleton h={480} /></div>
   return <BookingView b={b} mine={b.user === user?.id} act={act.mutate} busy={act.isPending} nav={nav} />
 }
@@ -172,7 +181,7 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
                 <XCircle /> Cancel booking
               </button>
             )}
-            <Link to={`/resources/${b.resource}`} className="key key-ghost">View {b.resource_name}</Link>
+            <Link to={`/resources/${b.resource}`} className={active ? 'key key-ghost' : 'key key-amber'}>{active ? `View ${b.resource_name}` : 'Book this room again'}</Link>
           </Reveal>
         </aside>
       </div>
