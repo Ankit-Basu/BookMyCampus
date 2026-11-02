@@ -1,200 +1,344 @@
-# BookMyCampus · LPU
+<div align="center">
 
-**One booking system for every bookable resource at Lovely Professional University**: classrooms,
-labs, high-value instruments, seminar halls, sports facilities, meeting rooms and vehicles. It has
-availability rules, approval chains, QR check-in, auto-release of no-shows, timetable-aware
-availability and utilisation analytics.
+# BookMyCampus
 
-> P20 · Campus Resource, Lab and Facility Booking Platform. **Track P: Django + PostgreSQL**, with a
-> React frontend.
+**Every lab, hall and turf at Lovely Professional University, bookable from one place.**
 
-The core guarantee, **zero double-bookings**, is enforced by a PostgreSQL exclusion constraint,
-not by application locks. The test suite fires 500 simultaneous attempts at one slot and asserts
-exactly one booking exists. → [docs/CONFLICT_PREVENTION.md](docs/CONFLICT_PREVENTION.md)
+Django · PostgreSQL · React
 
----
+[Screens](#a-look-around) · [Roles](#who-can-do-what) · [Run it](#run-it-locally) · [How double-booking is prevented](#why-two-people-cant-book-the-same-slot) · [Tests](#tests)
 
-## Quick start
+<br>
 
-Prerequisites: Python 3.12+, Node 20+, Docker Desktop.
+<img src="docs/screenshots/landing.jpg" alt="BookMyCampus landing page with a departure board of campus rooms and a sample booking pass" width="880">
 
-```bash
-# 1. Database + Redis
-docker compose up -d
+</div>
 
-# 2. Backend
-cd backend
-python -m venv .venv
-.venv/Scripts/activate            # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python manage.py migrate
-python manage.py seed_demo --reset   # realistic LPU campus + 4 weeks of history (~1 min)
-python manage.py runserver 127.0.0.1:8000
+<br>
 
-# 3. Background sweeps (auto-release, reminders, completion)
-#    In dev nothing extra is needed: `runserver` starts the sweeper in-process (AUTO_SWEEP=true).
-#    The control room's health strip shows when it last ran. Alternatives:
-python manage.py run_scheduler       # standalone loop
-celery -A config worker -B -l info   # production-style, uses Redis
+Booking a room at a university usually means a WhatsApp chain, a register book and a phone call to someone in Block 34. BookMyCampus replaces that with one catalogue of 32 seeded resources across seven types: classrooms, labs, instruments, seminar halls, sports facilities, meeting rooms and vehicles.
 
-# 4. Frontend
-cd ../frontend
-npm install
-npm run dev                          # http://localhost:5173 (hot reload, slower)
-npm run demo                         # optimised production build on :5173 — use this to present
-```
+You can see what is free right now, because the calendar already knows the timetable. You book it, get a QR pass, and scan in at the door. If you don't turn up, the slot goes back to everyone else.
 
-### Demo personas (password `campus123`)
+Built for problem statement **P20: Campus Resource, Lab and Facility Booking Platform** (Track P). It is a student project with seeded demo data, not an official LPU system.
 
-The login screen has one-click buttons for each.
+## A look around
 
-Students create their own account at `/register` with their 8-digit registration number, then sign in with it. Sign-up always creates a Student; other roles are assigned by an administrator.
+### Getting in
 
-| UMS ID | Role | Try this |
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/register.jpg" alt="Sign-up page asking for registration number, name, email and department"><br><sub><b>Sign up.</b> Registration number, name, department and a new password.</sub></td>
+<td width="50%"><img src="docs/screenshots/login.jpg" alt="Sign-in page with live campus stats and three demo personas"><br><sub><b>Sign in.</b> With one-click demo personas for trying it out.</sub></td>
+</tr>
+</table>
+
+### Find a room, pick a slot
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/explore.jpg" alt="Explore page with search, filters and room cards"><br><sub><b>Explore.</b> Search, filter by type, block or size, or show only what is free this hour.</sub></td>
+<td width="50%"><img src="docs/screenshots/calendar.jpg" alt="Room calendar with classes shown as locked blocks"><br><sub><b>Room calendar.</b> Classes, maintenance and other bookings are locked. Drag across what's left.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/booking-drawer.jpg" alt="Booking form with Just me and For a class options"><br><sub><b>Just me, or for a class.</b> A student's class booking always goes to the HOD.</sub></td>
+<td><img src="docs/screenshots/taken.jpg" alt="Panel for a taken slot with a waitlist button and free alternatives"><br><sub><b>Taken slots aren't a dead end.</b> Join the waitlist, or take a similar room free at that exact time.</sub></td>
+</tr>
+</table>
+
+### Your pass, your week
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/pass.jpg" alt="Booking pass with date, time, status and QR code"><br><sub><b>The pass.</b> QR code, live status, calendar export.</sub></td>
+<td width="50%"><img src="docs/screenshots/bookings.jpg" alt="My bookings page showing tickets"><br><sub><b>My bookings.</b> Upcoming, calendar and history.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/my-calendar.jpg" alt="Personal weekly calendar of a faculty member"><br><sub><b>My calendar.</b> A faculty member's week at a glance.</sub></td>
+<td><img src="docs/screenshots/map.jpg" alt="Campus map with vacancy pins on LPU blocks"><br><sub><b>Campus map.</b> How much of each block is free this hour.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/profile.jpg" alt="Profile page with show-up rate, no-show record, calendar sync and account settings"><br><sub><b>Profile.</b> Show-up rate, no-show record, calendar sync, your details and password.</sub></td>
+</tr>
+</table>
+
+### Campus Copilot
+
+Press <kbd>Ctrl</kbd> + <kbd>K</kbd> anywhere and ask in plain words. Copilot reads live data and can book, cancel or report a fault for you.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/copilot-welcome.jpg" alt="Campus Copilot panel with suggested questions"></td>
+<td width="50%"><img src="docs/screenshots/copilot.jpg" alt="Campus Copilot answering with a table and booking cards"></td>
+</tr>
+</table>
+
+### The HOD's side
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/approvals.jpg" alt="Approval queue with approve and reject buttons"><br><sub><b>Approval queue.</b> Who asked, for what, for which class.</sub></td>
+<td width="50%"><img src="docs/screenshots/analytics.jpg" alt="Analytics dashboard with utilisation figures and a chart"><br><sub><b>Control room.</b> Utilisation, idle assets and no-shows.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/catalogue.jpg" alt="Catalogue table with a New resource button and bulk import"><br><sub><b>Catalogue.</b> Add and edit resources, or import them from a CSV.</sub></td>
+</tr>
+</table>
+
+### Six themes, light and dark
+
+<table>
+<tr>
+<td width="33%"><img src="docs/screenshots/theme-cosmic.jpg" alt="Cosmic Night theme"><br><sub>Cosmic Night</sub></td>
+<td width="33%"><img src="docs/screenshots/theme-northern.jpg" alt="Northern Lights theme in light mode"><br><sub>Northern Lights</sub></td>
+<td width="33%"><img src="docs/screenshots/theme-rose.jpg" alt="Quantum Rose theme in light mode"><br><sub>Quantum Rose</sub></td>
+</tr>
+</table>
+
+### On a phone
+
+<table>
+<tr>
+<td width="33%"><img src="docs/screenshots/phone-explore.jpg" alt="Explore page on a phone"></td>
+<td width="33%"><img src="docs/screenshots/phone-pass.jpg" alt="Booking pass on a phone"></td>
+<td width="33%"><img src="docs/screenshots/phone-copilot.jpg" alt="Campus Copilot on a phone"></td>
+</tr>
+</table>
+
+## Who can do what
+
+The login screen offers three demo personas. The password for all of them is `campus123`.
+
+| Sign in as | Role | What they can do |
 |---|---|---|
-| `demo.student` | Student · CSE | Book for yourself, or "For a class" which goes to the HOD; check in from *Scan* |
-| `demo.faculty` | Faculty · CSE | Book labs and rooms, repeat weekly for a class |
-| `demo.head` | HOD · CSE | Approve requests from your department or for its rooms, add rooms, see usage |
+| `demo.student` | Student, CSE | Book for themselves or a class, check in by QR, save rooms, join waitlists |
+| `demo.faculty` | Faculty, CSE | All of that, plus repeat a booking weekly and book seminar halls and vehicles |
+| `demo.head` | HOD, CSE | Approve or reject requests, add rooms, see department usage |
 
-Facility manager and administrator accounts (`demo.manager`, `demo.admin`) still exist for campus-wide setup, but are not on the login screen.
+Real students register at `/register` with their 8-digit registration number and sign in with that. Sign-up always creates a Student account. Other roles are given by an administrator.
 
----
+An HOD sees requests from their own department and requests for rooms their department owns.
+
+`demo.manager` and `demo.admin` also exist for campus-wide setup such as rules, workflows and people. They aren't on the login screen, but you can sign in with them normally. `demo.admin` also has Django admin at `/django-admin/`.
+
+### Try the whole story in two minutes
+
+1. Sign in as **Student**, open a room, click a free slot, choose **For a class**, enter `K22CS-B` and send the request.
+2. Sign in as **HOD**, open **Approvals** and approve it.
+3. Back as **Student**, the booking is confirmed, with a notification and a QR pass.
+4. Click a grey **Booked** block on any room. See the free alternatives and choose **Tell me if it frees up**.
+5. Whoever holds that booking cancels it, and the student is notified straight away.
 
 ## What's in it
 
-| Module | Where | Highlights |
-|---|---|---|
-| **M1 Resource catalogue** | `apps/catalogue` | Types, attributes, photos, capacity, features, custodians, LPU block locations; faceted search; CSV bulk import; printable QR door posters |
-| **M2 Availability & rules** | `apps/rules` | Opening hours per type or per resource, min/max duration, notice period, booking window, blackouts, department/role/user quotas, runtime-editable policy |
-| **M3 Booking engine** | `apps/bookings` | Atomic slot claim via `EXCLUDE USING gist`, 409 with the reason (class / maintenance / taken), recurring series with per-occurrence conflict handling (skip or all-or-nothing) |
-| **M4 Timetable integration** | `apps/timetable` | P13 webhook (`X-Timetable-Token`) or pull (`TIMETABLE_SOURCE_URL`); classes written into the occupancy ledger; idempotent republish displaces newly-clashing bookings |
-| **M5 Approval workflow** | `apps/approvals` | Chains by resource type × requester role (custodian → HoD → facility manager); visual builder; approve a whole series in one click |
-| **M6 Check-in & auto-release** | `apps/bookings` | Scan the room poster *or* the custodian scans your pass; 15-min grace; auto-release sweep; progressive no-show restriction (warn → 7-day pause → 30-day pause); early check-out hands time back |
-| **M7 Maintenance** | `apps/maintenance` | Scheduled windows + one-tap breakdown reports; displaces affected bookings and notifies them; downtime tracking |
-| **M8 Consumables** | `apps/consumables` | Stock with oversell-proof atomic decrement, issue with booking, returns, low-stock alerts |
-| **M9 Analytics** | `apps/analytics` | Utilisation by resource/type/department/day, idle-value ranking, weekday×hour heatmap, no-show rates, demand vs supply, approval turnaround, downtime, quota consumption, nightly snapshots |
-| **M10 AI Campus Copilot** | `apps/ai_assistant` | Autonomous ReAct agent powered by Groq LPU with multi-key rotation and 7 database tools (`search_rooms`, `check_room_schedule`, `get_my_bookings`, `book_room`, `cancel_booking`, `report_maintenance`, `get_campus_overview`); interactive UI cards rendered in chat |
-| Interactive Campus Map | `frontend/pages/CampusMap` | Interactive Leaflet campus map of LPU blocks with live hourly colored vacancy rings |
-| Digital Boarding Pass | `frontend/components/BookingTicket` | Aviation-style ticket pass with dynamic live countdown timer, status pill, and one-tap calendar export |
-| Notifications | `apps/notifications` | Pushed live over **Server-Sent Events** (toast + bell the instant it happens) and emailed; SMTP via env vars |
-| People & master data | `apps/accounts`, `apps/catalogue` | User directory (search, role/department changes, deactivate, reset password, create accounts); resource types (icon, colour, who may book, check-in), locations with click-to-place map pins, departments + heads |
-| System health | `/api/system/health` | Control-room strip: database, sweeper heartbeat, live notifications, email mode, Redis |
-| Calendar sync | `/api/calendar/<token>.ics` | Personal iCal feed for Google / Outlook / Apple; per-booking `.ics` |
-| Navigation Redirect | `config/urls.py` | Visiting `http://127.0.0.1:8000/` automatically redirects to the frontend SPA at `http://localhost:5173/` |
+**Booking**
+- Single bookings, and weekly series that skip clashing dates or book nothing at all, your choice
+- Opening hours, minimum and maximum length, notice period, booking window, blackout dates and quotas
+- Approval chains set per resource type and requester role, editable without a redeploy
+- A waitlist that notifies you when a slot opens up, plus free alternatives for any taken slot
+- A **best time to book** chart on each room, built from four weeks of real usage
+- Saved rooms, a **Next up** strip and a personal calendar
 
-### Acceptance criteria → evidence
+**On the day**
+- QR check-in: scan the poster on the door, or have a staff member scan your pass
+- 15 minutes' grace, then the slot is released automatically
+- No-shows count against you: a warning, then a 7-day pause, then a 30-day pause
+- Finish early and check out, and the rest of your time goes back to the pool
 
-| Criterion | Evidence |
-|---|---|
-| 500 concurrent attempts → exactly one booking | `apps/bookings/tests/test_concurrency.py` |
-| Timetable-occupied slots never offered | `TimetableTest.test_timetabled_slot_never_offered`, `test_cannot_book_over_lecture` |
-| Workflows configurable per type without deployment | Control room → Rules & workflows (`/api/workflows`) |
-| QR check-in on mobile; auto-release after grace | `/scan` page; `CheckInAndReleaseTest` |
-| No-show tracking + progressive restriction | `test_progressive_restriction`; Control room → Operations → No-show monitor |
-| Utilisation + idle capacity across ≥ 3 types | Control room → Analytics (7 types seeded) |
-| Recurring bookings with per-occurrence conflicts | `RecurringTest` (skip + all-or-nothing) |
-| AI Copilot ReAct tool calling & key failover | `apps/ai_assistant/tests.py` (Groq API pool, 7 tool dispatches, card schemas) |
+**Running the campus**
+- Timetable sync over a webhook or by pulling from a URL. A republish moves any bookings that now clash
+- Maintenance windows and one-tap breakdown reports that notify affected bookings
+- Consumables with stock counts that can't oversell, issued alongside a booking
+- Analytics for utilisation, idle assets, a weekday-by-hour heatmap, no-shows, demand and approval times
+- CSV bulk import and printable QR door posters
+
+**Everywhere**
+- Live notifications over Server-Sent Events, plus email if you configure SMTP
+- A personal iCal feed for Google, Outlook or Apple Calendar, and `.ics` for single bookings
+- Campus Copilot: an AI agent with seven tools, running on Groq with key rotation and model fallback
+- <kbd>/</kbd> opens a command palette to jump to any page, room or theme
+
+## Run it locally
+
+You need **Python 3.12+**, **Node 20+** and **Docker Desktop**.
+
+**1. Start PostgreSQL and Redis**
 
 ```bash
-# Run full automated test suite (228 tests passing across all 11 apps)
-cd backend && python manage.py test apps
-
-# Verified test breakdown:
-python manage.py test apps.bookings      # 50 tests: engine, 500-way concurrency race, full HTTP API
-python manage.py test apps.analytics     # 48 tests: heatmaps, snapshots, idle capacity, utilisation
-python manage.py test apps.rules         # 24 tests: availability rules, blackouts, policy engine, quotas
-python manage.py test apps.approvals     # 16 tests: multi-tier workflow transitions, review queue
-python manage.py test apps.notifications # 16 tests: SSE event streaming, email notifications
-python manage.py test apps.catalogue     # 14 tests: faceted search, bulk CSV import, QR posters
-python manage.py test apps.consumables   # 14 tests: atomic stock decrement, issuances, restock
-python manage.py test apps.accounts      # 12 tests: JWT auth, directory CRUD, role permissions
-python manage.py test apps.timetable     # 12 tests: timetable publishing, webhook sync, displacement
-python manage.py test apps.maintenance   # 12 tests: windows, breakdown reports, downtime tracking
-python manage.py test apps.ai_assistant  # 10 tests: agent loop, multi-key rotation, 7 ReAct tools
+docker compose up -d
 ```
 
-### API (selection)
+**2. Start the backend**
 
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py seed_demo --reset
+python manage.py runserver 127.0.0.1:8000
 ```
-POST /api/auth/login                     GET  /api/resources?q=&type=&building=&free_from=&free_to=
-GET  /api/resources/:id/availability     GET  /api/resources/:id/qr          (door poster SVG)
-POST /api/bookings                       POST /api/bookings/:id/approve | reject
-POST /api/bookings/:id/check-in          POST /api/bookings/scan              (mobile scanner)
-POST /api/bookings/:id/check-out|cancel  GET  /api/bookings/:id/ics
-GET  /api/maintenance  POST /api/maintenance  POST /api/maintenance/report
-POST /api/timetable/publish              GET  /api/analytics/utilisation | heatmap | noshows | demand
-POST /api/ai/chat                        GET  /api/ai/suggestions            (Campus Copilot)
-GET  /api/notifications/stream          (Live SSE event stream)
+
+> [!WARNING]
+> `seed_demo --reset` deletes every user and booking in the database, including students who registered themselves. Run it once when setting up, not before a demo that people have signed up for.
+
+**3. Start the frontend** in a second terminal
+
+```bash
+cd frontend
+npm install
+npm run demo
 ```
 
----
+Open **http://localhost:5173**. `npm run demo` serves an optimised production build, which is the one to present with. Use `npm run dev` for hot reload while working on the code.
 
-## Stack & design
+Background jobs such as auto-release and reminders run inside `runserver` while `AUTO_SWEEP` is on, so you don't need anything extra in development. For a production-style setup, turn it off and run Celery:
 
-* **Backend:** Django 5.2, DRF, SimpleJWT, PostgreSQL 16 range types + `btree_gist`, Celery Beat on
-  Redis (sweeps only), Groq API Python SDK (OpenAI tool calling with LPU inference), `qrcode`, `ics`.
-* **Frontend:** React 19 + Vite + TypeScript, TanStack Query, FullCalendar (drag-to-select),
-  GSAP ScrollTrigger + Lenis smooth scrolling, Motion, Leaflet (LPU campus map on OpenStreetMap),
-  Recharts, html5-qrcode, and React Bits components (Aurora, Threads, Dock, SpotlightCard,
-  GlareHover, ScrollVelocity, Magnet, ClickSpark, Noise and more).
-* **AI Copilot:** Autonomous ReAct Agent with multi-key pool rotation (`GROQ_API_KEYS`), fallback
-  cascades (`openai/gpt-oss-120b`, `gpt-oss-20b`, `qwen/qwen3.8-27b`), keyboard shortcut <kbd>Ctrl</kbd> + <kbd>K</kbd>,
-  and interactive UI card rendering.
-* **Visual language:** "night campus box office". Frosted-glass panes over an ink sky, LPU-orange
-  accents, **skeuomorphic keycap buttons** and rocker switches, bookings as **ticket stubs** with
-  perforations and QR passes, utilisation as an **analog gauge**, and rubber-stamp approvals.
-
+```bash
+celery -A config worker -B -l info
 ```
+
+### Configuration
+
+Everything lives in `backend/.env`, and the defaults in `.env.example` work for local development.
+
+| Variable | What it does |
+|---|---|
+| `GROQ_API_KEYS` | Comma-separated Groq keys for Campus Copilot. Copilot needs at least one to answer |
+| `GROQ_MODEL`, `GROQ_FALLBACK_MODELS` | Which models Copilot uses, in order |
+| `POSTGRES_*`, `REDIS_URL` | Database and Redis. Docker publishes PostgreSQL on port **5433** |
+| `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS` | Where the frontend is served from |
+| `TIMETABLE_SOURCE_URL`, `TIMETABLE_WEBHOOK_TOKEN` | Timetable sync |
+| `AUTO_SWEEP` | Run background sweeps inside the web process |
+| `EMAIL_*` | Real email delivery. Emails print to the console by default |
+
+Never commit `.env`. It is already in `.gitignore`.
+
+## Why two people can't book the same slot
+
+The obvious approach is to check that a slot is free and then insert the booking. That is a race: two requests can both pass the check at the same moment, and both insert.
+
+So the application never makes that check. Every booking stores its time as a PostgreSQL range, and the table carries an exclusion constraint:
+
+```python
+ExclusionConstraint(
+    name="booking_no_overlap",
+    expressions=[("resource", RangeOperators.EQUAL), ("period", RangeOperators.OVERLAPS)],
+    condition=Q(status__in=["pending", "confirmed", "checked_in"]),
+)
+```
+
+The database refuses the second row, however many servers are running, and that refusal becomes a clear `409` saying what is in the way. A second constraint on a shared occupancy ledger applies the same rule across bookings, timetabled classes and maintenance.
+
+`test_concurrency.py` proves it the hard way: 500 threads, each with its own database connection, are released at the same instant at one slot, and exactly one booking must exist afterwards. The full reasoning is in [docs/CONFLICT_PREVENTION.md](docs/CONFLICT_PREVENTION.md).
+
+<p align="center">
+  <img src="docs/screenshots/race.jpg" alt="Landing page scene showing 500 requests, 1 booked and 499 refused" width="880">
+  <br>
+  <sub>The landing page tells the same story as you scroll: 500 requests, 1 booked, 499 refused.</sub>
+</p>
+
+## Tests
+
+```bash
+cd backend
+python manage.py test
+```
+
+There are 262 backend tests, and all of them pass. PostgreSQL must be running, because the tests use real range types and real concurrent connections. A full run takes about five minutes.
+
+| App | Tests | Covers |
+|---|---|---|
+| `bookings` | 78 | Engine, the 500-way race, HTTP API, class bookings, waitlist |
+| `rules` | 37 | Availability, blackouts, quotas, policy |
+| `approvals` | 32 | Workflow steps, queues, HOD routing |
+| `accounts` | 29 | Sign-up, sign-in, profile, permissions |
+| `analytics` | 14 | Utilisation, heatmap, idle capacity |
+| `catalogue` | 14 | Search, CSV import, saved rooms |
+| `consumables` | 14 | Stock and issuing |
+| `timetable` | 14 | Publishing, webhook, displaced bookings |
+| `maintenance` | 11 | Windows and breakdown reports |
+| `ai_assistant` | 10 | Agent loop, key rotation, tools |
+| `notifications` | 9 | Live stream and email |
+
+### Acceptance criteria
+
+| Criterion | Where to see it |
+|---|---|
+| 500 concurrent attempts, exactly one booking | `apps/bookings/tests/test_concurrency.py` |
+| Timetabled slots are never offered | `test_timetabled_slot_never_offered`, `test_cannot_book_over_lecture` |
+| Workflows change per type without a deployment | Control room → Rules & workflows |
+| Mobile QR check-in, auto-release after grace | `/scan`, `CheckInAndReleaseTest` |
+| No-show tracking with progressive restriction | `test_progressive_restriction`, Control room → Operations |
+| Utilisation and idle capacity across 3+ types | Control room → Analytics, with seven types seeded |
+| Recurring bookings with per-date conflict handling | `RecurringTest` |
+
+## How it's built
+
+| | |
+|---|---|
+| **Backend** | Django 5.2, Django REST Framework, SimpleJWT, PostgreSQL 16 (range types, `btree_gist`), Celery and Redis |
+| **Frontend** | React 19, TypeScript, Vite, TanStack Query, React Router |
+| **UI** | Tailwind CSS v4, shadcn/ui, tweakcn themes, React Bits, GSAP, Motion, Lenis |
+| **Features** | FullCalendar, Leaflet with OpenStreetMap, Recharts, html5-qrcode |
+| **AI** | Groq, using tool calling |
+
+```text
 backend/
-  config/            settings, urls, celery
+  config/            settings, URLs, Celery
   apps/
-    accounts/        users, roles, departments, JWT
-    catalogue/       resources, types, locations, images, seed_demo command
-    rules/           availability rules, blackouts, quotas, policy, availability engine
-    timetable/       P13 integration
-    bookings/        engine, ledger, check-in, no-shows, sweeps, tests
-    approvals/       workflows + decisions
-    maintenance/     maintenance windows, breakdowns, technician queue
-    consumables/     accessories & consumables inventory
-    analytics/       nightly snapshots, heatmap, utilisation, idle assets
-    notifications/   live SSE stream (/api/notifications/stream) + email
-    ai_assistant/    Campus Copilot: Groq client rotator, 7 ReAct tools, chat API
+    accounts/        users, roles, departments, sign-up, JWT
+    catalogue/       resources, types, locations, saved rooms, seed_demo
+    rules/           availability engine, blackouts, quotas, policy
+    bookings/        engine, ledger, check-in, no-shows, waitlist, sweeps
+    approvals/       workflows and decisions
+    timetable/       timetable sync
+    maintenance/     windows and breakdown reports
+    consumables/     stock and issuing
+    analytics/       snapshots, heatmap, utilisation
+    notifications/   live stream and email
+    ai_assistant/    Campus Copilot
 frontend/src/
-  pages/             Landing, Login, Explore, ResourcePage, MyBookings, BookingPage, Scan,
-                     Approvals, CampusMap, Profile, admin/*
-  components/        AppShell (dock), motion (GSAP/Lenis), ui, BookingTicket, reactbits/*,
-                     ai/CampusCopilot (drawer + rich cards)
-docs/CONFLICT_PREVENTION.md
+  pages/             Landing, Login, Register, Explore, ResourcePage, MyBookings,
+                     BookingPage, Scan, Approvals, CampusMap, Profile, admin/
+  components/        AppShell, CommandPalette, BookingTicket, ai/, shadcn/, reactbits/
+  styles/            theme tokens and stylesheets
+docs/                conflict prevention write-up, screenshots
 ```
 
-### Design system
+### Main API routes
 
-Glassmorphism + bento with tactile (skeuomorphic) controls and a "campus box office" identity:
-split-flap departure board, tear-off tickets, rubber stamps, handwritten margin notes.
+```text
+POST /api/auth/register                    POST /api/auth/login
+GET  /api/resources                        ?q= &type= &building= &free_from= &free_to= &saved=1
+GET  /api/resources/:id/availability       GET  /api/resources/:id/insights
+GET  /api/resources/:id/alternatives       POST /api/resources/:id/watch
+POST /api/bookings                         POST /api/bookings/:id/approve | reject | cancel
+POST /api/bookings/:id/check-in | check-out
+POST /api/bookings/scan                    GET  /api/bookings/:id/ics
+GET  /api/approvals/queue                  GET  /api/calendar/:token.ics
+POST /api/timetable/publish                POST /api/maintenance/report
+GET  /api/analytics/utilisation | heatmap | noshows | demand
+POST /api/ai/chat                          GET  /api/notifications/stream
+```
 
-* **Six themes, each with light and dark**, from [tweakcn](https://tweakcn.com) presets (`src/styles/themes.css`):
-  Solar Dusk, Cosmic Night, Northern Lights, Quantum Rose, Ocean Breeze, Elegant Luxury. Switching
-  recolours the UI and repaints the shader backdrop in a single frame.
-* **[shadcn/ui](https://ui.shadcn.com)** primitives (`src/components/shadcn`): dialogs, sheets, selects, popovers, menus and
-  the `/` command palette. **[React Bits](https://reactbits.dev)**: SplitFlapText, TearTicket, Grainient, PrismaticBurst,
-  BlurText, ShinyText, GlareHover, DecryptedText.
-* All colour derives from theme tokens (`src/styles/foundation.css`); nothing is hard-coded per page.
+### Keeping the glass smooth
 
-### Performance budget (why it feels smooth)
+Glassmorphism can get slow, because blurred panels redraw whenever the pixels behind them change. So the app backdrop is rendered once as a still frame, and the landing page's burst is drawn once and then rotated by CSS. Cards don't carry their own blur, the catalogue uses native scrolling, and sections below the fold on the landing page load only after the hero settles.
 
-* The app backdrop (React Bits Grainient) is rendered **once** as a still frame — glass panels
-  re-blur whenever the pixels behind them change, so an animated backdrop would re-blur every
-  panel every frame. Only the landing hero animates (PrismaticBurst, 40% resolution, 30 fps,
-  paused off-screen, no blend modes).
-* The marquee is a pure CSS animation (compositor thread); hero layers are promoted with
-  `will-change`, and nothing that moves carries a filter or a blurred text-shadow.
-* Native scrolling inside the app; Lenis smooth scrolling only on the landing page's scroll scenes.
-* Persistent layout route: the dock, top bar and backdrop never remount between pages.
-* Route chunks are preloaded while the browser is idle, and hovering a resource prefetches its
-  details and its first calendar week, so pages open with data already in cache.
-* Resource cards are memoised, use CSS entrances and `content-visibility`, and skip per-card
-  backdrop blur.
+## Known limits
 
-Campus map pins are approximate block positions on the LPU Phagwara campus. Custodians can
-correct them per location in the catalogue.
+- **Registration numbers aren't verified.** There is no connection to LPU's UMS, so someone could register with another student's number. A one-time code sent to an LPU email address would fix it.
+- **No self-service password reset.** An administrator can reset a password from the People page.
+- **Sign-in attempts aren't rate-limited yet.** Sign-up and password change are.
+- **Any user can block a room with a breakdown report.** It lasts 24 hours until someone marks it repaired, so production would want a staff member to confirm reports first.
+- **The phone camera needs HTTPS** for QR scanning, except on `localhost`.
+- **Map pins are approximate** and can be corrected per location in the catalogue.
+
+## Credits
+
+Built by [Ankan Basu](https://github.com/ankan123basu) and [Ankit Basu](https://github.com/Ankit-Basu).
+
+Conflict-prevention design is written up in [docs/CONFLICT_PREVENTION.md](docs/CONFLICT_PREVENTION.md). Room photos are from [Unsplash](https://unsplash.com), map data is © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, and UI pieces come from [shadcn/ui](https://ui.shadcn.com), [React Bits](https://reactbits.dev) and [tweakcn](https://tweakcn.com).
