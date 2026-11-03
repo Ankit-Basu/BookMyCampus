@@ -1,4 +1,8 @@
 """The story the demo tells: students and faculty book for themselves or a class, the HOD approves."""
+from io import StringIO
+from unittest.mock import patch
+
+from django.core.management import call_command
 from django.db import transaction
 from django.test import override_settings
 from rest_framework.test import APITestCase
@@ -190,7 +194,7 @@ class AlternativesAndInsightsTest(APITestCase):
 
 
 class DemoPersonaTest(APITestCase):
-    @override_settings(DEBUG=True)
+    @override_settings(DEMO_MODE=True)
     def test_login_offers_exactly_student_faculty_and_hod(self):
         for name, role in (("student", Role.STUDENT), ("faculty", Role.FACULTY), ("head", Role.DEPT_HEAD), ("manager", Role.FACILITY_MANAGER), ("admin", Role.ADMIN), ("custodian", Role.CUSTODIAN)):
             make_user(f"demo.{name}", role)
@@ -203,7 +207,7 @@ class DemoPersonaTest(APITestCase):
         auto_release_sweep()
         return Booking.objects.get(pk=b.pk)
 
-    @override_settings(DEBUG=True)
+    @override_settings(DEMO_MODE=True)
     def test_a_persona_stays_bookable_when_nobody_checks_in_for_it(self):
         _, _, lab, _ = make_campus()
         persona = make_user("demo.student", Role.STUDENT)
@@ -212,16 +216,27 @@ class DemoPersonaTest(APITestCase):
         self.assertEqual(persona.noshows.count(), 0)
         self.assertFalse(persona.is_restricted)
 
-    @override_settings(DEBUG=False)
-    def test_outside_debug_even_demo_named_accounts_get_strikes(self):
+    @override_settings(DEMO_MODE=False)
+    def test_outside_demo_mode_even_demo_named_accounts_get_strikes(self):
         _, _, lab, _ = make_campus()
         persona = make_user("demo.student", Role.STUDENT)
         self._missed(persona, lab)
         self.assertEqual(persona.noshows.count(), 1)
 
-    @override_settings(DEBUG=True)
+    @override_settings(DEMO_MODE=True)
     def test_real_students_still_get_strikes(self):
         _, _, lab, _ = make_campus()
         real = make_user("12306448", Role.STUDENT)
         self._missed(real, lab)
         self.assertEqual(real.noshows.count(), 1)
+
+
+class SchedulerTest(APITestCase):
+    def test_a_failed_sweep_does_not_end_the_loop(self):
+        ok = {"released": 0, "completed": 0, "reminders": 0}
+        with patch("apps.bookings.management.commands.run_scheduler.sweep_once", side_effect=[RuntimeError("database went away"), ok]) as sweep, \
+                patch("apps.bookings.management.commands.run_scheduler.time.sleep", side_effect=[None, KeyboardInterrupt]), \
+                patch("apps.bookings.management.commands.run_scheduler.close_old_connections"):
+            with self.assertRaises(KeyboardInterrupt):
+                call_command("run_scheduler", stderr=StringIO(), stdout=StringIO())
+        self.assertEqual(sweep.call_count, 2)

@@ -411,7 +411,7 @@ def auto_release_sweep(now=None):
                 continue
             set_status(locked, Booking.Status.RELEASED, f"Not checked in within {policy.grace_minutes} min")
             # Shared demo personas must stay bookable however long the app runs unattended.
-            strike = not (settings.DEBUG and locked.user.username.startswith("demo."))
+            strike = not (settings.DEMO_MODE and locked.user.username.startswith("demo."))
             if strike:
                 NoShow.objects.get_or_create(booking=locked, defaults={"user": locked.user, "resource": locked.resource})
             notify(

@@ -97,8 +97,8 @@ class AuthEndpointsTest(APITestCase):
         self.assertEqual(r.status_code, 401)
         self.assertEqual(r.data.get("error"), "user_not_found")
 
-    @override_settings(DEBUG=True)
-    def test_demo_accounts_exposed_in_debug(self):
+    @override_settings(DEMO_MODE=True)
+    def test_demo_accounts_exposed_in_demo_mode(self):
         # Create a demo user matching the demo. pattern
         User.objects.create_user(username="demo.student", password="pw", role=Role.STUDENT)
         r = self.client.get("/api/auth/demo-accounts")
@@ -106,8 +106,8 @@ class AuthEndpointsTest(APITestCase):
         self.assertGreater(len(r.data), 0)
         self.assertTrue(any(u["username"] == "demo.student" for u in r.data))
 
-    @override_settings(DEBUG=False)
-    def test_demo_accounts_hidden_in_production(self):
+    @override_settings(DEMO_MODE=False)
+    def test_demo_accounts_hidden_outside_demo_mode(self):
         r = self.client.get("/api/auth/demo-accounts")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data), 0)

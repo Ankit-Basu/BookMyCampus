@@ -74,8 +74,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--reset", action="store_true", help="Wipe domain data first")
+        parser.add_argument("--if-empty", action="store_true", help="Do nothing if the catalogue already has data (safe to run on every deploy)")
 
-    def handle(self, *args, reset=False, **kw):
+    def handle(self, *args, reset=False, if_empty=False, **kw):
+        if if_empty and Resource.objects.exists():
+            self.stdout.write("Catalogue already has data, skipping the seed.")
+            return
         random.seed(42)
         if reset:
             self.wipe()
@@ -142,6 +146,10 @@ class Command(BaseCommand):
         self.head = mk("demo.head", "Anil", "Kapoor", Role.DEPT_HEAD, "CSE")
         self.manager = mk("demo.manager", "Kavya", "Nair", Role.FACILITY_MANAGER, "ADM")
         self.admin = mk("demo.admin", "Sana", "Malik", Role.ADMIN, "ADM", is_staff=True, is_superuser=True)
+        if not settings.DEBUG:
+            for u in (self.manager, self.admin):
+                u.set_password(settings.DEMO_ADMIN_PASSWORD or None)
+                u.save(update_fields=["password"])
         self.custodian2 = mk("bio.custodian", "Priya", "Menon", Role.CUSTODIAN, "BIO")
         self.sports = mk("sports.custodian", "Harpreet", "Gill", Role.CUSTODIAN, "ADM")
         heads = {"ECE": ("Suresh", "Rao"), "MEC": ("Deepak", "Bhatia"), "BIO": ("Lakshmi", "Pillai"), "MGT": ("Neha", "Chawla")}

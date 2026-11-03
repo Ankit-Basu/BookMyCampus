@@ -121,8 +121,8 @@ class UserViewSet(mixins.CreateModelMixin, mixins.UpdateModelMixin, viewsets.Rea
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def demo_accounts(request):
-    """One-click personas on the login screen (only exposed while DEBUG is on). Three is all a demo needs."""
-    if not settings.DEBUG:
+    """One-click personas on the login screen (only exposed in DEMO_MODE). Three is all a demo needs."""
+    if not settings.DEMO_MODE:
         return Response([])
     out = []
     for role in (Role.STUDENT, Role.FACULTY, Role.DEPT_HEAD):

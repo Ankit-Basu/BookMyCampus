@@ -10,6 +10,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,9 +25,19 @@ def env_bool(name, default=False):
     return str(env(name, default)).lower() in ("1", "true", "yes", "on")
 
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-insecure-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
+SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-insecure-change-me" if DEBUG else None)
+if not SECRET_KEY:
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY when DJANGO_DEBUG is off.")
 ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")]
+
+# Render tells each service its public address. It also terminates HTTPS in front of the app.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+if host := env("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(host)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{host}")
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -107,6 +118,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+if not DEBUG:  # serves the Django admin's styling; runserver handles this itself in development
+    MIDDLEWARE.insert(MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1, "whitenoise.middleware.WhiteNoiseMiddleware")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -172,8 +185,13 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": "INFO"},
 }
 
-# Password given to the seeded demo personas (local development only).
+# Password given to the seeded demo personas.
 DEMO_PASSWORD = env("DEMO_PASSWORD", "campus123")
+# One-click personas on the login page, and no no-show strikes for them. Keep it on for a hosted demo.
+DEMO_MODE = env_bool("DEMO_MODE", DEBUG)
+# demo.manager and demo.admin can change campus-wide settings, so outside DEBUG they never get the
+# shared persona password: they use this one, or cannot sign in at all if it is unset.
+DEMO_ADMIN_PASSWORD = env("DEMO_ADMIN_PASSWORD", "")
 
 # Shared secret P13 sends in X-Timetable-Token when it republishes the timetable.
 TIMETABLE_WEBHOOK_TOKEN = env("TIMETABLE_WEBHOOK_TOKEN", "")
