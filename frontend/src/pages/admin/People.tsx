@@ -79,9 +79,9 @@ function Editor({ person, depts, onClose }: { person: Person | 'new' | null; dep
           }}
         >
           {isNew ? (
-            <label className="field"><span>UMS ID (username)</span><input name="username" className="input mono" placeholder="12215634" required /></label>
+            <label className="field"><span>Registration no. or ID</span><input name="username" className="input mono" placeholder="12215634" required /></label>
           ) : (
-            <div className="mono muted" style={{ fontSize: 12 }}>UMS ID {p!.username}{p!.last_login ? ` · last seen ${fmtRelative(p!.last_login)}` : ' · never signed in'}</div>
+            <div className="mono muted" style={{ fontSize: 12 }}>ID {p!.username}{p!.last_login ? ` · last seen ${fmtRelative(p!.last_login)}` : ' · never signed in'}</div>
           )}
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label className="field"><span>First name</span><input name="first_name" className="input" defaultValue={p?.first_name} required /></label>
@@ -149,7 +149,7 @@ export default function People() {
       <div className="filter-row glass-flat">
         <div className="row grow" style={{ gap: 8, minWidth: 220 }}>
           <MagnifyingGlass size={16} className="muted" />
-          <input className="input" style={{ height: 36 }} placeholder="Search name, UMS ID or email…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" style={{ height: 36 }} placeholder="Search name, ID or email…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Select style={{ width: 'auto', height: 36 }} value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="">All roles</option>
