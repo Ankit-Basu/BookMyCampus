@@ -76,7 +76,7 @@ function useBelowFold() {
   useEffect(() => {
     if (ready) return
     const go = () => setReady(true)
-    const id = setTimeout(go, 1400)
+    const id = setTimeout(go, 2800)
     const events = ['wheel', 'touchstart', 'pointerdown', 'keydown']
     events.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }))
     return () => {
@@ -112,7 +112,8 @@ function DepartureBoard({ names }: { names: string[] }) {
           <span className="mono board-gate">{'ABC'[i]}{i + 1}</span>
           <SplitFlapText
             words={words}
-            cycleDelay={3600 + i * 900}
+            cycleDelay={7000 + i * 2300}
+            intro={false}
             charset={FLAP_CHARS}
             padTo={24}
             align="left"
@@ -433,6 +434,12 @@ export default function Landing() {
   const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<Stats>('/public/stats').then((r) => r.data) })
   const hero = useRef<HTMLDivElement>(null)
   const belowFold = useBelowFold()
+  // Compiling the burst's shader stalls the page, so the rays wait until the hero's entrance has finished.
+  const [burst, setBurst] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setBurst(true), 1800)
+    return () => clearTimeout(id)
+  }, [])
 
   useGSAP(
     () => {
@@ -478,7 +485,7 @@ export default function Landing() {
         {mode === 'dark' && (
           <div className="hero-burst">
             <div className="burst-spin">
-              <PrismaticBurst colors={palette.burst} animationType="rotate" intensity={3} distort={0} rayCount={16} mixBlendMode="none" renderScale={0.5} stillAt={4} />
+              {burst && <PrismaticBurst colors={palette.burst} animationType="rotate" intensity={3} distort={0} rayCount={16} mixBlendMode="none" renderScale={0.5} stillAt={4} />}
             </div>
           </div>
         )}

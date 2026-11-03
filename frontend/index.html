@@ -8,7 +8,8 @@
     <meta name="description" content="BookMyCampus — one booking system for every room, lab, instrument, hall, court and vehicle at LPU." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Caveat:wght@500;700&family=Geist+Mono:wght@400;500;700&family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <!-- Non-blocking, so the first paint never waits on Google Fonts. -->
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Caveat:wght@500;700&family=Geist+Mono:wght@400;500;700&family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
     <script>
       try {
         var t = JSON.parse(localStorage.getItem('bmc.theme')) || {}
@@ -20,9 +21,16 @@
       }
     </script>
     <title>BookMyCampus · LPU</title>
+    <style>
+      html { background: #fafafa; color: #1d1a22; }
+      html.dark { background: #14121a; color: #f6efe2; }
+      .boot { position: fixed; inset: 0; display: grid; place-items: center; font: 700 22px/1 system-ui, sans-serif; letter-spacing: -0.02em; }
+      .boot span { display: flex; align-items: center; gap: 10px; }
+      .boot i { width: 30px; height: 30px; border-radius: 9px; background: #e8681a; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot"><span><i></i>BookMyCampus</span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
