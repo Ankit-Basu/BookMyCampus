@@ -6,6 +6,7 @@ user is allowed to ask for. Whether the slot is actually free is decided by the 
 """
 from datetime import datetime, time, timedelta
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
@@ -191,6 +192,9 @@ def _booked_minutes(qs, ws, we):
 def check_quotas(user, resource, start, end):
     from apps.bookings.models import Booking
 
+    # Shared personas are booked with over and over; a quota would lock out the next person trying the demo.
+    if settings.DEMO_MODE and user.username.startswith("demo."):
+        return
     quotas = list(quotas_for(user, resource))
     if not quotas:
         return

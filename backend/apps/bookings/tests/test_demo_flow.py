@@ -5,6 +5,7 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.db import transaction
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Department, Role
@@ -13,6 +14,7 @@ from apps.bookings.models import Booking, SlotWatch
 from apps.bookings.services import _insert, auto_release_sweep, set_status
 from apps.catalogue.models import Resource
 from apps.notifications.models import Notification
+from apps.rules.models import Quota
 
 from .factories import at, make_campus, make_user
 
@@ -229,6 +231,36 @@ class DemoPersonaTest(APITestCase):
         real = make_user("12306448", Role.STUDENT)
         self._missed(real, lab)
         self.assertEqual(real.noshows.count(), 1)
+
+
+class DemoQuotaTest(APITestCase):
+    def setUp(self):
+        self.dept, _, self.lab, _ = make_campus()
+        Quota.objects.create(role=Role.STUDENT, user_hours_per_week=1)
+
+    def book(self, user, hour):
+        self.client.force_authenticate(user)
+        day = 8 - timezone.localdate().weekday()  # next Tuesday, so both bookings share a week
+        return self.client.post("/api/bookings", {"resource": self.lab.id, "start": at(day, hour), "end": at(day, hour + 1), "title": "Session"}, format="json")
+
+    @override_settings(DEMO_MODE=True)
+    def test_a_persona_is_never_stopped_by_a_quota(self):
+        persona = make_user("demo.student", Role.STUDENT, self.dept)
+        self.assertEqual(self.book(persona, 10).status_code, 201)
+        self.assertEqual(self.book(persona, 12).status_code, 201)
+
+    @override_settings(DEMO_MODE=True)
+    def test_real_students_keep_their_quota(self):
+        real = make_user("12306448", Role.STUDENT, self.dept)
+        self.assertEqual(self.book(real, 10).status_code, 201)
+        second = self.book(real, 12)
+        self.assertEqual((second.status_code, second.data["error"]), (422, "quota_user"))
+
+    @override_settings(DEMO_MODE=False)
+    def test_outside_demo_mode_personas_have_quotas_too(self):
+        persona = make_user("demo.student", Role.STUDENT, self.dept)
+        self.assertEqual(self.book(persona, 10).status_code, 201)
+        self.assertEqual(self.book(persona, 12).status_code, 422)
 
 
 class SchedulerTest(APITestCase):
