@@ -6,7 +6,7 @@
 
 Django · PostgreSQL · React
 
-[Screens](#a-look-around) · [Roles](#who-can-do-what) · [Run it](#run-it-locally) · [How double-booking is prevented](#why-two-people-cant-book-the-same-slot) · [Tests](#tests)
+[Screens](#a-look-around) · [Roles](#who-can-do-what) · [Run it](#run-it-locally) · [Hosting](#hosting) · [How double-booking is prevented](#why-two-people-cant-book-the-same-slot) · [Tests](#tests)
 
 <br>
 
@@ -215,6 +215,16 @@ Everything lives in `backend/.env`, and the defaults in `.env.example` work for 
 | `EMAIL_*` | Real email delivery. Emails print to the console by default |
 
 Never commit `.env`. It is already in `.gitignore`.
+
+## Hosting
+
+The frontend goes on **Vercel** and the Django API and database go on **Render**, because live notifications and the auto-release job need a long-running server.
+
+**Render:** choose **New → Blueprint** and select this repo. `render.yaml` creates the database and the API, runs migrations and loads the demo data on the first deploy. Then add `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` with your Vercel address.
+
+**Vercel:** import the repo with `frontend` as the root directory and the Vite preset. `frontend/vercel.json` forwards `/api` to `https://bookmycampus-api.onrender.com`, so change it if Render gives your service a different address.
+
+On a hosted demo `demo.manager` and `demo.admin` use the generated `DEMO_ADMIN_PASSWORD` instead of `campus123`, and you can read it in the Render dashboard. The persona buttons stay available to anyone, so don't keep real student data on a public demo.
 
 ## Why two people can't book the same slot
 

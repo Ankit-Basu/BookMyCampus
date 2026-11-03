@@ -1,0 +1,55 @@
+# Render Blueprint: the Django API and its PostgreSQL database. The React frontend is hosted on Vercel.
+services:
+  - type: web
+    name: bookmycampus-api
+    runtime: python
+    region: singapore
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_demo --if-empty
+    # run_scheduler is the auto-release and reminder job. Threads keep live notification streams from blocking requests.
+    startCommand: python manage.py run_scheduler & gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 16 --timeout 0
+    healthCheckPath: /api/public/stats
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.2
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DEMO_MODE
+        value: "true"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEMO_ADMIN_PASSWORD
+        generateValue: true
+      - key: GROQ_API_KEYS
+        sync: false
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: bookmycampus-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: bookmycampus-db
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: bookmycampus-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: bookmycampus-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: bookmycampus-db
+          property: password
+
+databases:
+  - name: bookmycampus-db
+    region: singapore
+    plan: free
+    postgresMajorVersion: "16"
+    databaseName: bookmycampus
+    user: bmc
