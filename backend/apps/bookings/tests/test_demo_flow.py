@@ -1,4 +1,5 @@
 """The story the demo tells: students and faculty book for themselves or a class, the HOD approves."""
+import threading
 from io import StringIO
 from unittest.mock import patch
 
@@ -7,6 +8,7 @@ from django.db import transaction
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.accounts.models import Department, Role
 from apps.approvals.models import ApprovalStep, ApprovalWorkflow
@@ -14,6 +16,7 @@ from apps.bookings.models import Booking, SlotWatch
 from apps.bookings.services import _insert, auto_release_sweep, set_status
 from apps.catalogue.models import Resource
 from apps.notifications.models import Notification
+from apps.notifications.views import LiveStream
 from apps.rules.models import Quota
 
 from .factories import at, make_campus, make_user
@@ -272,3 +275,31 @@ class SchedulerTest(APITestCase):
             with self.assertRaises(KeyboardInterrupt):
                 call_command("run_scheduler", stderr=StringIO(), stdout=StringIO())
         self.assertEqual(sweep.call_count, 2)
+
+
+class UptimeTest(APITestCase):
+    def test_health_check_is_public_and_never_touches_the_database(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer expired.or.garbage")
+        with self.assertNumQueries(0):
+            self.assertEqual(self.client.get("/api/health").status_code, 200)
+
+    def test_open_streams_cannot_take_every_server_thread(self):
+        token = str(AccessToken.for_user(make_user("stud", Role.STUDENT)))
+        url = f"/api/notifications/stream?token={token}"
+        with patch("apps.notifications.views._stream_slots", threading.BoundedSemaphore(2)):
+            self.assertEqual([self.client.get(url).status_code for _ in range(3)], [200, 200, 503])
+
+    def test_a_closed_stream_gives_back_exactly_one_slot(self):
+        slots = threading.BoundedSemaphore(1)
+        slots.acquire()
+        stream = LiveStream((x for x in ()), slots)
+        stream.close()
+        stream.close()  # a second close must not raise or hand back a slot it no longer holds
+        self.assertTrue(slots.acquire(blocking=False))
+        self.assertFalse(slots.acquire(blocking=False))
+
+    def test_a_stream_with_a_bad_token_uses_no_slot(self):
+        slots = threading.BoundedSemaphore(1)
+        with patch("apps.notifications.views._stream_slots", slots):
+            self.assertEqual(self.client.get("/api/notifications/stream?token=bad").status_code, 401)
+        self.assertTrue(slots.acquire(blocking=False))

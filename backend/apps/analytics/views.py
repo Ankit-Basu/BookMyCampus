@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.core.cache import cache
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -82,6 +82,14 @@ def dashboard(request):
     return Response(services.dashboard(request.user))
 
 
+@api_view(["GET", "HEAD"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def health(request):
+    """For the hosting health check, which allows 5 seconds: it must stay cheap even on a very slow server."""
+    return Response({"ok": True})
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_stats(request):
@@ -114,7 +122,7 @@ def public_stats(request):
         "idle_top": idle and {k: idle[k] for k in ("name", "code", "value_inr", "utilisation", "image", "type")},
         "names": list(Resource.objects.exclude(status="retired").order_by("?").values_list("name", flat=True)[:14]),
     }
-    cache.set("public_stats", data, 300)
+    cache.set("public_stats", data, 1800)
     return Response(data)
 
 

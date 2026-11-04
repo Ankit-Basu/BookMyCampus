@@ -200,6 +200,9 @@ TIMETABLE_WEBHOOK_TOKEN = env("TIMETABLE_WEBHOOK_TOKEN", "")
 AUTO_SWEEP = env_bool("AUTO_SWEEP", DEBUG)
 AUTO_SWEEP_INTERVAL = int(env("AUTO_SWEEP_INTERVAL", "30"))
 
+# Most live notification streams open at once. Keep it below the server's thread count.
+MAX_LIVE_STREAMS = int(env("MAX_LIVE_STREAMS", "16"))
+
 # AI Copilot (Groq API Key Pool & Rotator)
 GROQ_API_KEYS = [k.strip() for k in env("GROQ_API_KEYS", "").split(",") if k.strip()]
 GROQ_MODEL = env("GROQ_MODEL", "openai/gpt-oss-120b")

@@ -1,6 +1,8 @@
 import json
+import threading
 import time
 
+from django.conf import settings
 from django.http import HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from rest_framework_simplejwt.exceptions import TokenError
@@ -40,6 +42,26 @@ class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return Response({"ok": True})
 
 
+# Each open stream occupies one server thread, so unlimited tabs would leave none for normal requests.
+_stream_slots = threading.BoundedSemaphore(settings.MAX_LIVE_STREAMS)
+
+
+class LiveStream:
+    """Gives its slot back when the response closes, including when the browser left before it started."""
+
+    def __init__(self, events, slots):
+        self.events, self.slots, self.closed = events, slots, False
+
+    def __iter__(self):
+        return self.events
+
+    def close(self):
+        if not self.closed:
+            self.closed = True
+            self.events.close()
+            self.slots.release()
+
+
 def stream(request):
     """
     Server-Sent Events: pushes each new notification to the browser the moment it is written, so
@@ -51,7 +73,16 @@ def stream(request):
     except (TokenError, KeyError):
         return HttpResponse(status=401)
 
-    last_id = Notification.objects.filter(user_id=user_id).order_by("-id").values_list("id", flat=True).first() or 0
+    # When full, the browser retries shortly and the bell still updates through its regular refresh.
+    slots = _stream_slots
+    if not slots.acquire(blocking=False):
+        return HttpResponse(status=503)
+
+    try:
+        last_id = Notification.objects.filter(user_id=user_id).order_by("-id").values_list("id", flat=True).first() or 0
+    except Exception:
+        slots.release()
+        raise
 
     def events():
         nonlocal last_id
@@ -69,7 +100,7 @@ def stream(request):
                 yield ": keep-alive\n\n"
             time.sleep(2)
 
-    resp = StreamingHttpResponse(events(), content_type="text/event-stream")
+    resp = StreamingHttpResponse(LiveStream(events(), slots), content_type="text/event-stream")
     resp["Cache-Control"] = "no-cache"
     resp["X-Accel-Buffering"] = "no"
     return resp

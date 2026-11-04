@@ -239,6 +239,7 @@ The frontend is on Vercel, with `frontend` as the root directory. `frontend/verc
 - Any signed-in user can block a room for 24 hours with a breakdown report. A real deployment should have staff confirm reports first.
 - Scanning QR codes with a phone camera needs HTTPS, except on `localhost`.
 - Campus map pins are approximate.
+- Live notifications are limited to 16 open connections at once. Beyond that, the notification bell still updates, but only every two minutes.
 - On the free hosting, uploaded images are lost on each redeploy and the database expires after about 30 days.
 
 ## Team
