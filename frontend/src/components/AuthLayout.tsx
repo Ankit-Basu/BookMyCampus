@@ -10,7 +10,7 @@ import Grainient from './reactbits/bg/Grainient'
 
 /** Live numbers from the catalogue, the same ones the landing page shows. */
 function AuthStats() {
-  const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<{ resources: number; bookings_30d: number }>('/public/stats').then((r) => r.data) })
+  const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<{ resources: number; bookings_30d: number }>('/public/stats').then((r) => r.data), retry: 12, retryDelay: 6000 })
   const tiles = [
     { v: data?.resources ?? '–', l: 'spaces to book' },
     { v: data?.bookings_30d ?? '–', l: 'bookings this month' },

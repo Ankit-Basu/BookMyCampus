@@ -32,6 +32,17 @@ type Stats = {
   names: string[]
 }
 
+// Shown until the backend answers, so the section is never empty while a sleeping server wakes up.
+const FALLBACK_TYPES: Stats['types'] = [
+  { name: 'Classroom', slug: 'classroom', color: '#F5B544', icon: 'chalkboard', count: 0, description: 'Lecture rooms with projection — faculty book freely, students need HOD approval.', cover: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1200&q=70&auto=format&fit=crop' },
+  { name: 'Equipment', slug: 'equipment', color: '#8B7CFF', icon: 'microscope', count: 0, description: 'High-value instruments and lendable kit. HOD approval required.', cover: 'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=1200&q=70&auto=format&fit=crop' },
+  { name: 'Laboratory', slug: 'laboratory', color: '#3EE6C1', icon: 'flask', count: 0, description: 'Teaching and research labs.', cover: 'https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=1200&q=70&auto=format&fit=crop' },
+  { name: 'Meeting Room', slug: 'meeting-room', color: '#5AB2FF', icon: 'users-three', count: 0, description: 'Bookable rooms for group work and meetings.', cover: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?w=1200&q=70&auto=format&fit=crop' },
+  { name: 'Seminar Hall', slug: 'seminar-hall', color: '#FF7A59', icon: 'presentation', count: 0, description: 'Halls and auditoria for events, talks and defences.', cover: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=70&auto=format&fit=crop' },
+  { name: 'Sports Facility', slug: 'sports-facility', color: '#5FD068', icon: 'basketball', count: 0, description: 'Courts, turf and fitness spaces.', cover: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=1200&q=70&auto=format&fit=crop' },
+  { name: 'Vehicle', slug: 'vehicle', color: '#E66BD3', icon: 'van', count: 0, description: 'Campus transport for field trips and official travel.', cover: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=1200&q=70&auto=format&fit=crop' },
+]
+
 const FLAP_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789&-·' "
 const FALLBACK = ['AI & DEEP LEARNING LAB', 'CONFOCAL MICROSCOPE', 'FOOTBALL TURF', 'CSE SEMINAR HALL', 'BADMINTON HALL A', '52-SEATER COACH']
 const flapName = (n: string) => n.toUpperCase().slice(0, 24)
@@ -333,7 +344,7 @@ function TypeRail({ types }: { types: Stats['types'] }) {
                 <span className="display" style={{ fontSize: 30 }}>{t.name}</span>
               </div>
               <p>{t.description}</p>
-              <span className="rail-count mono">{t.count} bookable <ArrowRight size={13} weight="bold" /></span>
+              <span className="rail-count mono">{t.count ? `${t.count} bookable` : 'Browse'} <ArrowRight size={13} weight="bold" /></span>
             </div>
           </Link>
         ))}
@@ -431,7 +442,7 @@ function FeatureBento({ stats }: { stats?: Stats }) {
 export default function Landing() {
   const { user } = useAuth()
   const { mode, palette } = useTheme()
-  const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<Stats>('/public/stats').then((r) => r.data) })
+  const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<Stats>('/public/stats').then((r) => r.data), retry: 12, retryDelay: 6000 })
   const hero = useRef<HTMLDivElement>(null)
   const belowFold = useBelowFold()
   // Compiling the burst's shader stalls the page, so the rays wait until the hero's entrance has finished.
@@ -533,7 +544,7 @@ export default function Landing() {
         <div className="stats-grid">
           {stats.map((s) => (
             <div key={s.l} data-reveal className="stat-big glass">
-              <span className="display"><Counter to={s.v} duration={1.5} /></span>
+              <span className="display">{data ? <Counter to={s.v} duration={1.5} /> : '–'}</span>
               <span className="stat-label">{s.l}</span>
             </div>
           ))}
@@ -547,7 +558,7 @@ export default function Landing() {
       {belowFold ? (
         <>
           <RaceScene />
-          <TypeRail types={data?.types ?? []} />
+          <TypeRail types={data?.types ?? FALLBACK_TYPES} />
 
           <section id="features" className="page features">
             <Reveal>
