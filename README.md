@@ -231,6 +231,8 @@ The backend and database are on Render, using `render.yaml`. In Render, choose *
 
 The frontend is on Vercel, with `frontend` as the root directory. `frontend/vercel.json` forwards `/api` requests to the Render backend, so update it if your Render address is different.
 
+Render's free plan sleeps after 15 minutes without traffic, so `.github/workflows/keep-awake.yml` pings the backend every 10 minutes while the demo needs to stay available. GitHub can delay scheduled runs, so the first request can still occasionally take up to a minute.
+
 ## Known limitations
 
 - Registration numbers are not verified, because there is no connection to LPU's UMS. Someone could register with another student's number.
@@ -240,7 +242,7 @@ The frontend is on Vercel, with `frontend` as the root directory. `frontend/verc
 - Scanning QR codes with a phone camera needs HTTPS, except on `localhost`.
 - Campus map pins are approximate.
 - Live notifications are limited to 16 open connections at once. Beyond that, the notification bell still updates, but only every two minutes.
-- On the free hosting, uploaded images are lost on each redeploy and the database expires after about 30 days.
+- On the free hosting, uploaded images are lost on each redeploy and the database expires after 30 days.
 
 ## Team
 
