@@ -73,6 +73,9 @@ export const retryUnlessMissing = (count: number, e: unknown) => ![403, 404].inc
 export function errorMessage(e: unknown): string {
   const ax = e as AxiosError<ApiError | Record<string, string[]>>
   const d = ax?.response?.data as ApiError & Record<string, unknown>
+  const status = ax?.response?.status
+  if (status && status >= 502 && status <= 504) return 'The server is waking up. Wait a few seconds and try again.'
+  if (typeof d === 'string') return status ? `The server had a problem (${status}). Try again in a moment.` : 'Something went wrong'
   if (d) {
     if (typeof d.message === 'string') return d.message
     if (typeof d.detail === 'string') return d.detail

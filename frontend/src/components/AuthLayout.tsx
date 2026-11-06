@@ -8,9 +8,26 @@ import { ThemeMenu, Wordmark } from './AppShell'
 import { Sparks } from './Backdrop'
 import Grainient from './reactbits/bg/Grainient'
 
+// The free backend sleeps when idle and takes up to a minute to wake, so these requests keep retrying.
+export const WAKE_RETRY = { retry: 12, retryDelay: 6000 }
+
+function usePublicStats() {
+  return useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<{ resources: number; bookings_30d: number }>('/public/stats').then((r) => r.data), ...WAKE_RETRY })
+}
+
+/** True once the backend has answered, or once it has stopped retrying, so a form is never blocked for good. */
+export function useServerReady() {
+  const { isSuccess, isError } = usePublicStats()
+  return isSuccess || isError
+}
+
+export function ServerWaking() {
+  return <p className="auth-switch muted" role="status" style={{ fontSize: 12.5 }}>Waking up the server. On the free plan this can take up to a minute.</p>
+}
+
 /** Live numbers from the catalogue, the same ones the landing page shows. */
 function AuthStats() {
-  const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<{ resources: number; bookings_30d: number }>('/public/stats').then((r) => r.data), retry: 12, retryDelay: 6000 })
+  const { data } = usePublicStats()
   const tiles = [
     { v: data?.resources ?? '–', l: 'spaces to book' },
     { v: data?.bookings_30d ?? '–', l: 'bookings this month' },

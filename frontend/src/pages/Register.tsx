@@ -6,7 +6,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import AuthLayout from '../components/AuthLayout'
+import AuthLayout, { ServerWaking, useServerReady, WAKE_RETRY } from '../components/AuthLayout'
 import { Select } from '../components/ui'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -32,7 +32,8 @@ export default function Register() {
   const { search } = useLocation()
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState<Errors>({})
-  const { data: depts = [] } = useQuery({ queryKey: ['public-depts'], queryFn: () => api.get<Dept[]>('/auth/departments').then((r) => r.data) })
+  const ready = useServerReady()
+  const { data: depts = [] } = useQuery({ queryKey: ['public-depts'], queryFn: () => api.get<Dept[]>('/auth/departments').then((r) => r.data), ...WAKE_RETRY })
 
   const set = (k: keyof typeof EMPTY, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -138,11 +139,12 @@ export default function Register() {
           </Field>
           <button
             className="key key-amber key-lg"
-            disabled={!form.registration_no || !form.first_name.trim() || !form.email.trim() || !form.password || !form.confirm || register.isPending}
+            disabled={!form.registration_no || !form.first_name.trim() || !form.email.trim() || !form.password || !form.confirm || !ready || register.isPending}
             style={{ marginTop: 6 }}
           >
-            <UserPlus weight="bold" /> {register.isPending ? 'Creating your account…' : 'Create account'}
+            <UserPlus weight="bold" /> {!ready ? 'Waiting for the server…' : register.isPending ? 'Creating your account…' : 'Create account'}
           </button>
+          {!ready && <ServerWaking />}
           <p className="auth-switch">Already registered? <Link to={`/login${search}`}>Sign in</Link></p>
         </div>
       </motion.form>

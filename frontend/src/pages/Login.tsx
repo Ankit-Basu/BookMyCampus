@@ -5,7 +5,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import AuthLayout from '../components/AuthLayout'
+import AuthLayout, { ServerWaking, useServerReady, WAKE_RETRY } from '../components/AuthLayout'
 import { api, errorMessage } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ROLE_LABEL } from '../lib/format'
@@ -28,7 +28,8 @@ export default function Login() {
   const [username, setUsername] = useState(justRegistered ?? '')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const { data: demos } = useQuery({ queryKey: ['demo'], queryFn: () => api.get<Demo[]>('/auth/demo-accounts').then((r) => r.data) })
+  const { data: demos } = useQuery({ queryKey: ['demo'], queryFn: () => api.get<Demo[]>('/auth/demo-accounts').then((r) => r.data), ...WAKE_RETRY })
+  const ready = useServerReady()
 
   if (user) return <Navigate to={next} replace />
 
@@ -84,10 +85,11 @@ export default function Login() {
                 <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" autoFocus={!!justRegistered} />
               </div>
             </label>
-            <button className="key key-amber key-lg" disabled={!username || !password || !!busy} style={{ marginTop: 6 }}>
-              <SignIn weight="bold" /> {busy === username ? 'Signing in…' : 'Sign in'}
+            <button className="key key-amber key-lg" disabled={!username || !password || !!busy || !ready} style={{ marginTop: 6 }}>
+              <SignIn weight="bold" /> {!ready ? 'Waiting for the server…' : busy === username ? 'Signing in…' : 'Sign in'}
             </button>
             <Link to={`/register${search}`} className="key key-ghost">Create an account</Link>
+            {!ready && <ServerWaking />}
             <p className="auth-switch muted" style={{ fontSize: 12.5 }}>Forgot your password? The facility office can reset it for you.</p>
           </div>
 
@@ -97,7 +99,7 @@ export default function Login() {
               <div className="eyebrow" style={{ marginBottom: 12 }}>One-click demo personas</div>
               <div className="persona-grid persona-list">
                 {demos.map((d) => (
-                  <button type="button" key={d.username} className="persona" onClick={() => go(d.username, d.password)} disabled={!!busy}>
+                  <button type="button" key={d.username} className="persona" onClick={() => go(d.username, d.password)} disabled={!!busy || !ready}>
                     <span className="avatar sm">{d.name.split(' ').map((p) => p[0]).join('')}</span>
                     <span className="grow" style={{ textAlign: 'left', minWidth: 0 }}>
                       <span className="truncate" style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{ROLE_LABEL[d.role] ?? d.role_label}</span>
