@@ -44,6 +44,8 @@ class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
 # Each open stream occupies one server thread, so unlimited tabs would leave none for normal requests.
 _stream_slots = threading.BoundedSemaphore(settings.MAX_LIVE_STREAMS)
+# A proxy can keep a stream open after its tab is gone, so streams stay short and the browser resumes them.
+STREAM_SECONDS = 60
 
 
 class LiveStream:
@@ -79,7 +81,12 @@ def stream(request):
         return HttpResponse(status=503)
 
     try:
-        last_id = Notification.objects.filter(user_id=user_id).order_by("-id").values_list("id", flat=True).first() or 0
+        # On reconnect the browser sends the last id it received, so nothing written in between is lost.
+        resume = request.headers.get("Last-Event-ID", "")
+        if resume.isdigit():
+            last_id = int(resume)
+        else:
+            last_id = Notification.objects.filter(user_id=user_id).order_by("-id").values_list("id", flat=True).first() or 0
     except Exception:
         slots.release()
         raise
@@ -89,12 +96,11 @@ def stream(request):
         yield "retry: 4000\n\n"
         started = time.monotonic()
         beat = 0.0
-        # each connection lives ~5 minutes, then the browser transparently reconnects
-        while time.monotonic() - started < 300:
+        while time.monotonic() - started < STREAM_SECONDS:
             fresh = list(Notification.objects.filter(user_id=user_id, id__gt=last_id).order_by("id")[:20])
             for n in fresh:
                 last_id = n.id
-                yield f"event: notification\ndata: {json.dumps(NotificationSerializer(n).data, default=str)}\n\n"
+                yield f"id: {n.id}\nevent: notification\ndata: {json.dumps(NotificationSerializer(n).data, default=str)}\n\n"
             if time.monotonic() - beat > 15:
                 beat = time.monotonic()
                 yield ": keep-alive\n\n"

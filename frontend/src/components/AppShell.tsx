@@ -121,7 +121,9 @@ function useLiveNotifications(onEvent: (n: Notification) => void) {
         }
       })
       es.onerror = () => {
-        es?.close()
+        // A stream that ends normally reconnects by itself and resumes from its last event.
+        // Only a refused one (expired token, server full) needs a fresh start.
+        if (es?.readyState !== EventSource.CLOSED) return
         if (!closed) timer = setTimeout(connect, 8000)
       }
     }

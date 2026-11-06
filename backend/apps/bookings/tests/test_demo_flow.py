@@ -303,3 +303,28 @@ class UptimeTest(APITestCase):
         with patch("apps.notifications.views._stream_slots", slots):
             self.assertEqual(self.client.get("/api/notifications/stream?token=bad").status_code, 401)
         self.assertTrue(slots.acquire(blocking=False))
+
+    def _stream(self, **headers):
+        token = str(AccessToken.for_user(self.listener))
+        return self.client.get(f"/api/notifications/stream?token={token}", **headers)
+
+    def test_a_reconnecting_browser_gets_what_it_missed(self):
+        self.listener = make_user("listener", Role.STUDENT)
+        seen = Notification.objects.create(user=self.listener, title="Seen before the drop")
+        Notification.objects.create(user=self.listener, title="Written while reconnecting")
+        Notification.objects.create(user=make_user("other", Role.STUDENT), title="Someone else's")
+        with patch("apps.notifications.views._stream_slots", threading.BoundedSemaphore(4)):
+            chunks = iter(self._stream(HTTP_LAST_EVENT_ID=str(seen.id)).streaming_content)
+            self.assertIn(b"retry", next(chunks))
+            event = next(chunks)
+        self.assertIn(b"Written while reconnecting", event)
+        self.assertIn(f"id: {seen.id + 1}".encode(), event)
+
+    def test_a_fresh_stream_skips_old_notifications_and_ends_on_time(self):
+        self.listener = make_user("listener", Role.STUDENT)
+        Notification.objects.create(user=self.listener, title="Old news")
+        with patch("apps.notifications.views._stream_slots", threading.BoundedSemaphore(4)), \
+                patch("apps.notifications.views.STREAM_SECONDS", 0):
+            chunks = list(self._stream().streaming_content)
+        self.assertEqual(len(chunks), 1)
+        self.assertIn(b"retry", chunks[0])
