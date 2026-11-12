@@ -169,8 +169,11 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
 
           <Reveal className="glass pad col" style={{ gap: 10 }}>
             {active && b.qr_token && <SharePass b={b} />}
-            <button className="key key-ghost" onClick={() => download(`/bookings/${b.id}/ics`, `${b.reference}.ics`)}>
-              <CalendarPlus /> Add to calendar (.ics)
+            <a className="key key-ghost" href={googleCalendarUrl(b)} target="_blank" rel="noopener noreferrer">
+              <CalendarPlus /> Add to Google Calendar
+            </a>
+            <button className="muted" style={{ fontSize: 12.5, alignSelf: 'center', background: 'none', border: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => download(`/bookings/${b.id}/ics`, `${b.reference}.ics`)}>
+              Using Outlook or Apple Calendar? Download the .ics file
             </button>
             {b.status === 'checked_in' && (
               <button className="key key-amber" disabled={busy} onClick={() => act({ path: 'check-out' })}>
@@ -222,4 +225,19 @@ ${url}`)
       <ShareNetwork weight="bold" /> Share pass with my group
     </button>
   )
+}
+
+/** Google Calendar's "add event" page, filled in. Opens in the browser, so nothing is downloaded. */
+function googleCalendarUrl(b: Booking) {
+  const utc = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const pass = b.qr_token ? `\nPass: ${shareOrigin()}/pass/${b.qr_token}` : ''
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${b.title} · ${b.resource_name}`,
+    dates: `${utc(b.start)}/${utc(b.end)}`,
+    details: `BookMyCampus booking ${b.reference}${b.on_behalf_of ? ` for ${b.on_behalf_of}` : ''}.${pass}`,
+    location: b.location ?? b.resource_name,
+    ctz: 'Asia/Kolkata',
+  })
+  return `https://calendar.google.com/calendar/render?${params}`
 }
