@@ -18,9 +18,19 @@ import { useAuth } from '../lib/auth'
 import { durationLabel, inr, WEEKDAYS } from '../lib/format'
 import { initialWeek } from '../lib/preload'
 import type { Availability, Booking, Resource, ResourceDetail } from '../lib/types'
+import { qrPath } from '../lib/shareOrigin'
 
 type Consumable = { id: number; name: string; kind: string; unit: string; stock: number }
 
+
+/** What people usually book each type for, as the title placeholder. */
+const TITLE_HINT: Record<string, string> = {
+  Classroom: 'e.g. Make-up class for CSE310',
+  Laboratory: 'e.g. CSE408 practical',
+  'Seminar Hall': 'e.g. Guest lecture',
+  'Sports Facility': 'e.g. Football practice',
+  Equipment: 'e.g. Capstone model training',
+}
 function BookingDrawer({
   resource,
   slot,
@@ -160,7 +170,7 @@ function BookingDrawer({
           )}
           <label className="field">
             <span>What’s it for?</span>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Capstone model training" maxLength={160} required />
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={TITLE_HINT[resource.type_name] ?? 'e.g. Project team meeting'} maxLength={160} required />
           </label>
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label className="field">
@@ -399,7 +409,7 @@ export default function ResourcePage() {
     setSlot({ start: s.start, end: s.end })
   }
 
-  const showQr = async () => setQr(await blobUrl(`/resources/${id}/qr`))
+  const showQr = async () => setQr(await blobUrl(qrPath(`/resources/${id}/qr`)))
   const [maintOpen, setMaintOpen] = useState(false)
 
   type Window = { id: number; kind: string; title: string; start: string; end: string; status: string; reported_by_name: string | null }
@@ -453,7 +463,7 @@ export default function ResourcePage() {
   if (!r) return <div className="page"><Skeleton h={420} /></div>
   const gallery = r.images.length ? r.images.map((i) => i.src) : [r.cover]
   const isCustodian = user?.custodian_of.includes(r.id) || user?.role === 'facility_manager' || user?.role === 'admin'
-  // Labs and seminar halls are for staff. Students can still see when they are free, but not book them.
+  // Labs, classrooms, seminar halls and vehicles are for staff. Students can still see when they are free, but not book them.
   const canBook = r.can_book !== false
   const staffOnly = `${r.type_name === 'Laboratory' ? 'Labs' : r.type_name + 's'} are booked by faculty and staff.`
 

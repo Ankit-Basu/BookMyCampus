@@ -127,7 +127,12 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
                   {b.purpose && <p className="muted" style={{ margin: '4px 0 0', fontSize: 13.5 }}>{b.purpose}</p>}
                   <div className="mono muted" style={{ fontSize: 12, marginTop: 10 }}>REF {b.reference} · {b.attendees} people</div>
                 </div>
-                <BookingQR b={b} size={150} />
+                <div className="col" style={{ alignItems: 'center', gap: 6 }}>
+                  <BookingQR b={b} size={150} />
+                  {['pending', 'confirmed', 'checked_in'].includes(b.status) && (
+                    <span className="muted" style={{ fontSize: 11.5, textAlign: 'center', maxWidth: 150 }}>Show this at the door. Any phone camera can verify it.</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -1044,6 +1044,29 @@
   margin-top: 18px;
 }
 
+/* ---------------------------------------------------------------- pass check (opened from a pass QR) */
+
+.pass-page {
+  min-height: 100vh;
+  background: var(--background);
+}
+.pass-verdict {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  color: var(--c);
+  border: 1px solid color-mix(in oklab, var(--c) 45%, transparent);
+  background: color-mix(in oklab, var(--c) 12%, var(--card));
+}
+.pass-verdict .muted {
+  color: var(--fg-2);
+}
+@media (max-width: 520px) {
+  .pass-page .login-top {
+    padding: 16px;
+  }
+}
+
 /* ---------------------------------------------------------------- approvals */
 
 .approval-card {

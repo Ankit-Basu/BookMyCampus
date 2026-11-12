@@ -172,11 +172,11 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ catalogue
     def catalogue(self):
         T = {}
-        # Labs and seminar halls are booked by teaching and support staff, never by students.
+        # Labs, classrooms and seminar halls are booked by teaching and support staff, never by students.
         STAFF_ROLES = [Role.FACULTY, Role.STAFF, Role.CUSTODIAN, Role.DEPT_HEAD, Role.FACILITY_MANAGER, Role.ADMIN]
         types = [
-            ("Classroom", "chalkboard", "#F5B544", "Lecture rooms with projection — faculty book freely, students need HOD approval.", [], False),
-            ("Laboratory", "flask", "#3EE6C1", "Teaching and research labs. Faculty and staff book these.", STAFF_ROLES, True),
+            ("Classroom", "chalkboard", "#F5B544", "Lecture rooms with projection. Faculty book these for classes and make-up classes.", STAFF_ROLES, False),
+            ("Laboratory", "flask", "#3EE6C1", "Teaching and research labs. Faculty and staff book these for practicals.", STAFF_ROLES, True),
             ("Equipment", "microscope", "#8B7CFF", "High-value instruments and lendable kit. HOD approval required.", [], True),
             ("Seminar Hall", "presentation", "#FF7A59", "Halls and auditoria for events, talks and defences.", STAFF_ROLES, True),
             ("Sports Facility", "basketball", "#5FD068", "Courts, turf and fitness spaces.", [], True),
@@ -311,7 +311,6 @@ class Command(BaseCommand):
                 ApprovalStep.objects.create(workflow=w, order=i, name=n, approver_role=r, sla_hours=24)
 
         wf("Equipment — HOD sign-off", "Equipment", [], [("HOD approval", Role.DEPT_HEAD)])
-        wf("Students in classrooms", "Classroom", [Role.STUDENT], [("HOD approval", Role.DEPT_HEAD)])
         wf("Seminar hall events", "Seminar Hall", [], [("HOD approval", Role.DEPT_HEAD)])
         wf("Vehicle requisition", "Vehicle", [], [("HOD approval", Role.DEPT_HEAD)])
 
@@ -380,7 +379,7 @@ class Command(BaseCommand):
         titles = {"Laboratory": ["Project build", "Practice session", "Thesis experiments", "Club workshop"],
                   "Meeting Room": ["Group study", "Project sync", "Mock interview", "Startup pitch prep"],
                   "Sports Facility": ["Team practice", "Inter-hostel match", "Fitness session"],
-                  "Classroom": ["Extra class", "Doubt session", "Club meeting"],
+                  "Classroom": ["Make-up class", "Extra class", "Doubt session"],
                   "Equipment": ["Sample run", "Prototype print", "Measurements", "Video shoot"],
                   "Seminar Hall": ["Guest lecture", "Hackathon finals", "Thesis defence"],
                   "Vehicle": ["Industrial visit", "Field trip", "Official travel"]}

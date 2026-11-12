@@ -7,6 +7,7 @@ import { blobUrl } from '../lib/api'
 import { durationLabel, fmtDay, fmtTime } from '../lib/format'
 import type { Booking } from '../lib/types'
 import { StatusTag } from './ui'
+import { qrPath } from '../lib/shareOrigin'
 
 const GRACE = 15
 const OPENS = 15
@@ -32,7 +33,7 @@ export const mmss = (ms: number) => {
 
 export function BookingQR({ b, size = 92 }: { b: Booking; size?: number }) {
   const active = ['pending', 'confirmed', 'checked_in'].includes(b.status)
-  const { data } = useQuery({ queryKey: ['booking-qr', b.id], queryFn: () => blobUrl(`/bookings/${b.id}/qr`), enabled: active, staleTime: Infinity })
+  const { data } = useQuery({ queryKey: ['booking-qr', b.id], queryFn: () => blobUrl(qrPath(`/bookings/${b.id}/qr`)), enabled: active, staleTime: Infinity })
   if (!active) return <QrCode size={size * 0.6} weight="thin" className="muted" />
   return <div className="qr-plate" style={{ width: size }}>{data ? <img src={data} alt="booking pass" /> : <div style={{ height: size - 12 }} />}</div>
 }

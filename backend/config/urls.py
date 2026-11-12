@@ -47,6 +47,7 @@ api = [
     path("timetable/current", timetable.current),
     path("timetable/versions", timetable.versions),
     path("calendar/<uuid:token>.ics", bookings.calendar_feed),
+    path("public/pass/<str:token>", bookings.public_pass),
     path("health", analytics.health),
     path("public/stats", analytics.public_stats),
     path("system/health", analytics.system_health),

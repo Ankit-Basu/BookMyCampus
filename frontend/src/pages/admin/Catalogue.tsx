@@ -8,6 +8,7 @@ import { Drawer, Modal, StatusTag, TypeTag, Select } from '../../components/ui'
 import { api, blobUrl, errorMessage } from '../../lib/api'
 import { inr } from '../../lib/format'
 import type { Resource, ResourceDetail } from '../../lib/types'
+import { qrPath } from '../../lib/shareOrigin'
 
 const SAMPLE = `code,name,type,department,building,floor,room,capacity,features,value_inr,image_url,description
 LAB-34-IOT,IoT Studio,Laboratory,CSE,Block 34 · School of CSE,5,508,24,Sensors|Soldering|AC,1800000,,Hands-on IoT studio
@@ -135,7 +136,7 @@ export default function Catalogue() {
                 <td><StatusTag status={r.status === 'active' ? 'checked_in' : r.status === 'down' ? 'rejected' : 'cancelled'} label={r.status === 'active' ? 'Active' : r.status === 'down' ? 'Down' : 'Retired'} /></td>
                 <td>
                   <div className="row" style={{ gap: 6 }}>
-                    <button className="key key-ghost key-sm key-icon" title="Check-in poster" onClick={async () => setQr({ url: await blobUrl(`/resources/${r.id}/qr`), name: r.name })}><Printer size={15} /></button>
+                    <button className="key key-ghost key-sm key-icon" title="Check-in poster" onClick={async () => setQr({ url: await blobUrl(qrPath(`/resources/${r.id}/qr`)), name: r.name })}><Printer size={15} /></button>
                     <button className="key key-ghost key-sm key-icon" title="Edit" onClick={() => setEdit(r.id)}><PencilSimple size={15} /></button>
                   </div>
                 </td>

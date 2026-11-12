@@ -22,10 +22,11 @@ The demo has 32 resources across 7 types: classrooms, laboratories, equipment, s
 
 - Search and filter resources by type, block and capacity, or show only what is free this hour
 - Room calendar that already shows classes from the timetable, maintenance and other bookings
-- Students book classrooms, meeting rooms, sports facilities and equipment for themselves
-- Laboratories, seminar halls and vehicles are for faculty and staff. Students can see when they are free but cannot book them
+- Students book meeting rooms, sports facilities and equipment for themselves
+- Labs (for practicals), classrooms (for classes and make-up classes), seminar halls and vehicles are booked by faculty and staff. Students can see when they are free but cannot book them
 - Faculty can also book for a whole class
-- QR pass for each booking, with check-in by scanning the poster on the room door
+- QR pass for each booking. Any phone camera can scan it to see whether the booking is valid right now, and staff can check the booker in from there
+- Check-in by scanning the poster on the room door
 - Waitlist for a taken slot, with a notification if it opens up
 - Similar rooms that are free at the same time as a taken slot
 - Hourly chart on each room showing when it is usually quiet
@@ -114,10 +115,10 @@ New students can also register at `/register` with their 8-digit registration nu
 
 To see the main flow:
 
-1. Sign in as Student, open a classroom and click a free slot. A student's classroom booking needs HOD approval, so it is sent as a request.
+1. Sign in as Student, open a piece of equipment and click a free slot. Equipment needs HOD approval, so it is sent as a request.
 2. Sign in as HOD, open **Approvals** and approve it.
 3. Sign in as Student again. The booking is now confirmed, with a QR pass.
-4. Sign in as Faculty, open a laboratory and book it **For a class**, such as `K22CS-B`. Only faculty and staff can book labs or book for a class.
+4. Sign in as Faculty, open a classroom or lab and book it **For a class**, such as `K22CS-B`. Only faculty and staff can book labs and classrooms.
 
 ## Tech stack
 
@@ -191,7 +192,7 @@ cd backend
 python manage.py test
 ```
 
-There are 272 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
+There are 282 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
 
 | Requirement | Where it is checked |
 |---|---|
@@ -242,6 +243,7 @@ Render's free plan sleeps after 15 minutes without traffic, so `.github/workflow
 - Sign-in attempts are not rate limited yet.
 - Any signed-in user can block a room for 24 hours with a breakdown report. A real deployment should have staff confirm reports first.
 - Scanning QR codes with a phone camera needs HTTPS, except on `localhost`.
+- When running locally, QR codes point to this computer's Wi-Fi address so a phone on the same Wi-Fi can open them. Set `LAN_HOST` if the wrong address is picked.
 - Campus map pins are approximate.
 - Live notifications are limited to 16 open connections at once. Beyond that, the notification bell still updates, but only every two minutes.
 - On the free hosting, uploaded images are lost on each redeploy and the database expires after 30 days.

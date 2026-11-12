@@ -340,3 +340,92 @@ class UptimeTest(APITestCase):
             chunks = list(self._stream().streaming_content)
         self.assertEqual(len(chunks), 1)
         self.assertIn(b"retry", chunks[0])
+
+
+class PassQrTest(APITestCase):
+    """A pass QR is a link anyone can open to see whether the booking is good right now."""
+
+    def setUp(self):
+        self.dept, self.rtype, self.lab, _ = make_campus()
+        self.owner = make_user("owner", Role.FACULTY, self.dept)
+        self.owner.first_name, self.owner.last_name = "Asha", "Rao"
+        self.owner.save()
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/bookings", {"resource": self.lab.id, "start": at(2, 10), "end": at(2, 11), "title": "CSE408 practical"}, format="json")
+        self.booking = Booking.objects.get(pk=r.data["id"])
+        self.client.force_authenticate(None)
+
+    def url(self):
+        return f"/api/public/pass/{self.booking.qr_token}"
+
+    def test_qr_encodes_the_public_pass_link(self):
+        self.client.force_authenticate(self.owner)
+        svg = self.client.get(f"/api/bookings/{self.booking.id}/qr").content.decode()
+        self.assertIn("<svg", svg)
+        from apps.bookings.views import pass_url
+        self.assertTrue(pass_url(self.booking).endswith(f"/pass/{self.booking.qr_token}"))
+
+    def test_anyone_can_read_the_pass_without_signing_in(self):
+        r = self.client.get(self.url())
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual((r.data["booked_by"], r.data["state"], r.data["title"]), ("Asha Rao", "upcoming", "CSE408 practical"))
+        self.assertIsNone(r.data["booking_id"])
+        self.assertFalse(r.data["can_check_in"])
+
+    def test_unknown_or_malformed_pass_is_a_404(self):
+        self.assertEqual(self.client.get("/api/public/pass/00000000-0000-0000-0000-000000000000").status_code, 404)
+        self.assertEqual(self.client.get("/api/public/pass/not-a-token").status_code, 404)
+
+    def test_pass_states(self):
+        from apps.bookings.views import pass_state
+        b = self.booking
+        self.assertEqual(pass_state(b, now=b.start - timezone.timedelta(hours=2)), "upcoming")
+        self.assertEqual(pass_state(b, now=b.start), "valid_now")
+        self.assertEqual(pass_state(b, now=b.end), "ended")
+        set_status(b, Booking.Status.CANCELLED)
+        self.assertEqual(pass_state(b), "void")
+
+    def test_staff_scan_the_link_to_check_the_booker_in(self):
+        hod = make_user("hod", Role.DEPT_HEAD, self.dept)
+        self.client.force_authenticate(hod)
+        r = self.client.get(self.url())
+        self.assertEqual(r.data["booking_id"], self.booking.id)
+        self.assertTrue(r.data["can_check_in"])
+        link = f"https://book-my-campus-ab.vercel.app/pass/{self.booking.qr_token}"
+        with patch("django.utils.timezone.now", return_value=self.booking.start):
+            r = self.client.post("/api/bookings/scan", {"code": link}, format="json")
+        self.assertEqual((r.status_code, r.data["status"]), (200, "checked_in"))
+
+    def test_students_cannot_check_someone_else_in_with_the_link(self):
+        self.client.force_authenticate(make_user("stu", Role.STUDENT, self.dept))
+        with patch("django.utils.timezone.now", return_value=self.booking.start):
+            r = self.client.post("/api/bookings/scan", {"code": f"x/pass/{self.booking.qr_token}"}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+
+class QrLinkBaseTest(APITestCase):
+    """QR links follow the page's own address only when it is trusted, so a phone can open codes made locally."""
+
+    def base(self, origin, debug=True):
+        from rest_framework.request import Request
+        from rest_framework.test import APIRequestFactory
+
+        from apps.catalogue.views import share_base
+
+        with override_settings(DEBUG=debug, FRONTEND_URL="https://bmc.example", CORS_ALLOWED_ORIGINS=["http://localhost:5173"]):
+            return share_base(Request(APIRequestFactory().get("/x", {"origin": origin} if origin is not None else {})))
+
+    def test_uses_the_configured_frontend_by_default(self):
+        self.assertEqual(self.base(None), "https://bmc.example")
+
+    def test_follows_a_wifi_address_while_running_locally(self):
+        self.assertEqual(self.base("http://10.36.72.122:5173"), "http://10.36.72.122:5173")
+        self.assertEqual(self.base("http://localhost:5173"), "http://localhost:5173")
+
+    def test_never_points_at_another_site(self):
+        self.assertEqual(self.base("https://evil.example"), "https://bmc.example")
+        self.assertEqual(self.base("http://10.0.0.5:5173/phish"), "https://bmc.example")
+        self.assertEqual(self.base("javascript:alert(1)"), "https://bmc.example")
+
+    def test_production_ignores_private_addresses(self):
+        self.assertEqual(self.base("http://10.36.72.122:5173", debug=False), "https://bmc.example")

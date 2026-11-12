@@ -1,6 +1,8 @@
 import csv
 import io
+import ipaddress
 from datetime import timedelta
+from urllib.parse import urlparse
 
 import qrcode
 import qrcode.image.svg
@@ -31,6 +33,30 @@ from .serializers import (
     ResourceListSerializer,
     ResourceTypeSerializer,
 )
+
+
+def share_base(request):
+    """
+    Where a QR code's link should point. Normally the configured frontend. A page may ask for its own
+    address instead, so codes made on a PC running the app locally open on a phone on the same Wi-Fi.
+    Only the configured frontend, the CORS origins and, in DEBUG, private network addresses are accepted,
+    so a code can never be made to send people to some other site.
+    """
+    default = settings.FRONTEND_URL.rstrip("/")
+    asked = str(request.query_params.get("origin", "")).rstrip("/")
+    if not asked or asked == default:
+        return default
+    if asked in {o.rstrip("/") for o in settings.CORS_ALLOWED_ORIGINS}:
+        return asked
+    if settings.DEBUG:
+        parsed = urlparse(asked)
+        try:
+            ip = ipaddress.ip_address(parsed.hostname or "")
+        except ValueError:
+            ip = None
+        if parsed.scheme in ("http", "https") and not parsed.path and ip and (ip.is_private or ip.is_loopback):
+            return f"{parsed.scheme}://{parsed.netloc}"
+    return default
 
 
 def qr_svg(data, box=12):
@@ -244,7 +270,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
     def qr(self, request, pk=None):
         """Printable check-in poster code. Encodes a deep link the mobile scanner understands."""
         r = self.get_object()
-        return HttpResponse(qr_svg(f"{settings.FRONTEND_URL}/scan?r={r.checkin_token}"), content_type="image/svg+xml")
+        return HttpResponse(qr_svg(f"{share_base(request)}/scan?r={r.checkin_token}"), content_type="image/svg+xml")
 
     @action(detail=True, methods=["get"], url_path="checkin-token", permission_classes=[IsManager])
     def checkin_token(self, request, pk=None):

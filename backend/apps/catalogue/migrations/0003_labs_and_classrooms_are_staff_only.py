@@ -1,9 +1,14 @@
-"""Laboratories are booked by faculty and staff only. Upcoming student lab bookings in the demo data are withdrawn."""
+"""Labs and classrooms are booked by faculty and staff only: labs for practicals, classrooms for classes and make-up classes.
+Upcoming student bookings of either in the demo data are withdrawn."""
 from django.db import migrations
 from django.utils import timezone
 
 STAFF_ROLES = ["faculty", "staff", "custodian", "dept_head", "facility_manager", "admin"]
-NOTE = "Withdrawn: laboratories are now booked by faculty and staff only."
+NOTE = "Withdrawn: labs and classrooms are now booked by faculty and staff only."
+DESCRIPTIONS = {
+    "Laboratory": "Teaching and research labs. Faculty and staff book these for practicals.",
+    "Classroom": "Lecture rooms with projection. Faculty book these for classes and make-up classes.",
+}
 
 
 def forwards(apps, schema_editor):
@@ -13,14 +18,12 @@ def forwards(apps, schema_editor):
     Booking = apps.get_model("bookings", "Booking")
     BookingSlot = apps.get_model("bookings", "BookingSlot")
 
-    labs = ResourceType.objects.filter(name="Laboratory")
-    if not labs.exists():
-        return
-    labs.update(allowed_roles=STAFF_ROLES, description="Teaching and research labs. Faculty and staff book these.")
-    Workflow.objects.filter(name="Student lab access").update(is_active=False)
+    for name, description in DESCRIPTIONS.items():
+        ResourceType.objects.filter(name=name).update(allowed_roles=STAFF_ROLES, description=description)
+    Workflow.objects.filter(name__in=["Student lab access", "Students in classrooms"]).update(is_active=False)
 
     upcoming = Booking.objects.filter(
-        resource__type__name="Laboratory",
+        resource__type__name__in=list(DESCRIPTIONS),
         user__role="student",
         status__in=["pending", "confirmed"],
         period__startswith__gt=timezone.now(),

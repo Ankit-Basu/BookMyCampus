@@ -17,7 +17,8 @@ from apps.accounts.models import User
 from apps.accounts.permissions import IsManager
 from apps.approvals.services import decide
 from apps.catalogue.models import Resource
-from apps.catalogue.views import qr_svg
+from apps.catalogue.views import qr_svg, share_base
+from apps.rules.models import Policy
 from apps.consumables.services import issue_for_booking
 
 from . import services
@@ -146,9 +147,9 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
 
     @action(detail=True, methods=["get"], url_path="qr")
     def qr(self, request, pk=None):
-        """The booker's pass — a custodian scans this to verify them at the door."""
+        """The booker's pass. Any phone camera opens the verification page; staff can check the booker in from there."""
         b = self.get_object()
-        return HttpResponse(qr_svg(f"BMC:{b.id}:{b.qr_token}", box=10), content_type="image/svg+xml")
+        return HttpResponse(qr_svg(pass_url(b, share_base(request)), box=10), content_type="image/svg+xml")
 
     @action(detail=True, methods=["get"], url_path="ics")
     def ics(self, request, pk=None):
@@ -164,10 +165,16 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         """
         Single mobile endpoint for the QR scanner:
           * resource poster  (…/scan?r=<uuid>)  → checks in *your* current booking there
-          * booking pass     (BMC:<id>:<uuid>)  → custodian verifies a booker
+          * booking pass     (…/pass/<uuid>, or the older BMC:<id>:<uuid>)  → custodian verifies a booker
         """
         raw = str(request.data.get("code", "")).strip()
-        if raw.startswith("BMC:"):
+        if "/pass/" in raw:
+            token = raw.split("/pass/")[-1].split("?")[0].split("#")[0].strip("/")
+            b = _booking_by_pass(token)
+            if b is None:
+                raise BookingError("bad_token", "Unrecognised booking pass.")
+            b = services.check_in(b, request.user, token)
+        elif raw.startswith("BMC:"):
             try:
                 _, bid, token = raw.split(":", 2)
                 b = Booking.objects.select_related("resource").filter(pk=int(bid)).first()
@@ -223,6 +230,70 @@ class NoShowViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             u.restriction_reason = ""
             u.save(update_fields=["restricted_until", "restriction_reason"])
         return Response(NoShowSerializer(ns).data)
+
+
+def pass_url(booking, base=None):
+    return f"{(base or settings.FRONTEND_URL).rstrip('/')}/pass/{booking.qr_token}"
+
+
+def _booking_by_pass(token):
+    try:
+        uuid.UUID(str(token))
+    except ValueError:
+        return None
+    return Booking.objects.select_related("resource__type", "resource__location", "user", "checkin").filter(qr_token=token).first()
+
+
+def pass_state(b, now=None):
+    """What the person at the door needs to know: can this pass be used right now?"""
+    now = now or timezone.now()
+    if b.status == Booking.Status.CHECKED_IN:
+        return "checked_in"
+    if b.status == Booking.Status.PENDING:
+        return "pending"
+    if b.status != Booking.Status.CONFIRMED:
+        return "void"
+    if now >= b.end:
+        return "ended"
+    policy = Policy.get()
+    opens = b.start - timedelta(minutes=policy.checkin_open_minutes)
+    if now < opens:
+        return "upcoming"
+    return "valid_now"
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_pass(request, token):
+    """
+    The page a booking pass QR opens, for whoever scans it: a guard, a lab assistant, the booker.
+    The token is an unguessable UUID that only the pass carries, so it shows just what a ticket would.
+    """
+    b = _booking_by_pass(token)
+    if b is None:
+        return Response({"error": "not_found", "message": "This pass doesn't match any booking."}, status=404)
+    user = request.user if request.user.is_authenticated else None
+    checkin = getattr(b, "checkin", None)
+    return Response({
+        "reference": b.reference,
+        "resource": b.resource.name,
+        "resource_type": b.resource.type.name,
+        "location": str(b.resource.location) if b.resource.location else None,
+        "start": b.start,
+        "end": b.end,
+        "status": b.status,
+        "status_label": b.get_status_display(),
+        "state": pass_state(b),
+        "booked_by": b.user.get_full_name() or b.user.username,
+        "on_behalf_of": b.on_behalf_of,
+        "attendees": b.attendees,
+        "title": b.title,
+        "requires_checkin": b.resource.type.requires_checkin,
+        "checked_in_at": checkin.checked_in_at if checkin else None,
+        # Only for someone signed in: the booker gets a link to their booking, staff get a check-in button.
+        "booking_id": b.id if user and (user.pk == b.user_id or user.is_manager) else None,
+        "can_check_in": bool(user and user.is_manager and b.status == Booking.Status.CONFIRMED and b.resource.type.requires_checkin),
+    })
 
 
 @api_view(["GET"])
