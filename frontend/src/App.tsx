@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 
 import AppShell from './components/AppShell'
@@ -15,6 +15,7 @@ const ResourcePage = lazy(pages.resource)
 const MyBookings = lazy(pages.bookings)
 const BookingPage = lazy(pages.booking)
 const Scan = lazy(pages.scan)
+const Study = lazy(pages.study)
 const Approvals = lazy(pages.approvals)
 const CampusMap = lazy(pages.map)
 const Profile = lazy(pages.profile)
@@ -42,9 +43,16 @@ function Page() {
 }
 
 function Splash() {
+  // Only mention the wait if there is one: the free server can take up to a minute to wake.
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 4000)
+    return () => clearTimeout(t)
+  }, [])
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', alignContent: 'center', gap: 18 }}>
       <div className="loader-ticket" />
+      {slow && <p className="muted fade-in" role="status" style={{ fontSize: 13, margin: 0 }}>Waking up the server. On the free plan this can take up to a minute.</p>}
     </div>
   )
 }
@@ -67,6 +75,7 @@ export default function App() {
               <Route path="/bookings" element={<MyBookings />} />
               <Route path="/bookings/:id" element={<BookingPage />} />
               <Route path="/scan" element={<Scan />} />
+              <Route path="/study" element={<Study />} />
               <Route path="/map" element={<CampusMap />} />
               <Route path="/me" element={<Profile />} />
               <Route path="/approvals" element={<ManagerOnly><Approvals /></ManagerOnly>} />

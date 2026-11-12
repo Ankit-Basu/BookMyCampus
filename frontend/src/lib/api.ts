@@ -30,7 +30,8 @@ api.interceptors.request.use((cfg) => {
   return cfg
 })
 
-let refreshing: Promise<string | null> | null = null
+// null: the refresh token was refused, so sign out. undefined: the server didn't answer, so stay signed in.
+let refreshing: Promise<string | null | undefined> | null = null
 
 api.interceptors.response.use(
   (r) => r,
@@ -45,9 +46,13 @@ api.interceptors.response.use(
           setTokens({ access: r.data.access, refresh: tokens.refresh })
           return r.data.access as string
         })
-        .catch(() => {
-          setTokens(null)
-          return null
+        .catch((e: AxiosError) => {
+          const s = e.response?.status
+          if (s === 400 || s === 401) {
+            setTokens(null)
+            return null
+          }
+          return undefined
         })
         .finally(() => {
           refreshing = null
@@ -58,7 +63,7 @@ api.interceptors.response.use(
         ;(original.headers as Record<string, string>).Authorization = `Bearer ${access}`
         return api(original)
       }
-      window.dispatchEvent(new Event('bmc:logout'))
+      if (access === null) window.dispatchEvent(new Event('bmc:logout'))
     }
     return Promise.reject(error)
   },

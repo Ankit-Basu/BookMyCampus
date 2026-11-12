@@ -10,6 +10,7 @@ export const pages = {
   bookings: () => import('../pages/MyBookings'),
   booking: () => import('../pages/BookingPage'),
   scan: () => import('../pages/Scan'),
+  study: () => import('../pages/Study'),
   map: () => import('../pages/CampusMap'),
   profile: () => import('../pages/Profile'),
   approvals: () => import('../pages/Approvals'),
@@ -21,7 +22,7 @@ const idle = (fn: () => void) =>
 
 /** After first paint, quietly download + parse every page chunk one by one while the CPU is idle. */
 export function warmRoutes(isManager: boolean) {
-  const order: (keyof typeof pages)[] = ['resource', 'bookings', 'booking', 'scan', 'map', 'profile']
+  const order: (keyof typeof pages)[] = ['resource', 'bookings', 'booking', 'scan', 'study', 'map', 'profile']
   if (isManager) order.push('approvals', 'admin')
   let i = 0
   const next = () => {

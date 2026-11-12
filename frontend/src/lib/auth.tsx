@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
+import type { AxiosError } from 'axios'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import { api, getTokens, setTokens } from './api'
@@ -24,12 +25,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       return
     }
-    try {
-      const r = await api.get<User>('/me')
-      setUser(r.data)
-    } catch {
-      setTokens(null)
-      setUser(null)
+    // Only a real "not signed in" answer signs you out. A sleeping or restarting server is waited for
+    // (about a minute), and if it still hasn't answered the saved sign-in is kept for next time.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await api.get<User>('/me')
+        setUser(r.data)
+        return
+      } catch (e) {
+        const status = (e as AxiosError).response?.status
+        if (status === 401 || status === 403 || !getTokens()) {
+          setTokens(null)
+          setUser(null)
+          return
+        }
+        if (attempt >= 11) {
+          setUser(null)
+          return
+        }
+        await new Promise((r) => setTimeout(r, 5000))
+      }
     }
   }, [])
 

@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarPlus, CheckCircle, Circle, QrCode, SignOut, Timer, XCircle } from '@phosphor-icons/react'
+import { ArrowLeft, CalendarPlus, CheckCircle, Circle, QrCode, ShareNetwork, SignOut, Timer, XCircle } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { type CSSProperties } from 'react'
@@ -11,6 +11,7 @@ import { Skeleton, StatusTag, Empty } from '../components/ui'
 import { api, download, errorMessage, retryUnlessMissing } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { durationLabel, fmtRelative, ROLE_LABEL } from '../lib/format'
+import { shareOrigin } from '../lib/shareOrigin'
 import type { Booking } from '../lib/types'
 
 function Timeline({ b }: { b: Booking }) {
@@ -167,6 +168,7 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
           </Reveal>
 
           <Reveal className="glass pad col" style={{ gap: 10 }}>
+            {active && b.qr_token && <SharePass b={b} />}
             <button className="key key-ghost" onClick={() => download(`/bookings/${b.id}/ics`, `${b.reference}.ics`)}>
               <CalendarPlus /> Add to calendar (.ics)
             </button>
@@ -191,5 +193,33 @@ function BookingView({ b, mine, act, busy, nav }: { b: Booking; mine: boolean; a
         </aside>
       </div>
     </div>
+  )
+}
+
+/** Send the pass to the people you booked with, so any of them can show it at the door. */
+function SharePass({ b }: { b: Booking }) {
+  const url = `${shareOrigin()}/pass/${b.qr_token}`
+  const share = async () => {
+    const text = `${b.resource_name}, ${format(new Date(b.start), 'EEE d MMM HH:mm')}–${format(new Date(b.end), 'HH:mm')} (${b.reference})`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Booking pass', text, url })
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text}
+${url}`)
+      toast.success('Pass link copied', { description: 'Paste it to your group. It opens on any phone.' })
+    } catch {
+      toast.info('Copy this link', { description: url })
+    }
+  }
+  return (
+    <button className="key key-mint" onClick={share}>
+      <ShareNetwork weight="bold" /> Share pass with my group
+    </button>
   )
 }

@@ -2,11 +2,11 @@ import type { DateSelectArg, EventInput } from '@fullcalendar/core'
 import interactionPlugin from '@fullcalendar/interaction'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { ArrowLeft, ArrowRight, BellRinging, CalendarPlus, Clock, GraduationCap, LockSimple, MapPin, Printer, Repeat, SealCheck, Stamp, User, UsersThree, Warning, Wrench } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, BellRinging, CalendarPlus, ChalkboardTeacher, Clock, GraduationCap, LockSimple, MapPin, Printer, Repeat, SealCheck, Stamp, User, UsersThree, Warning, Wrench } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Reveal } from '../components/motion'
@@ -263,6 +263,62 @@ function BookingDrawer({
 type Taken = { kind: string; label: string; start: Date; end: Date }
 type Alternatives = { rooms: Resource[]; next_free: string | null }
 
+type Teacher = { id: number; name: string; department: string | null; same_department: boolean }
+
+/** Students can't book labs or classrooms, so they ask a teacher, who gets a link with the slot filled in. */
+function AskTeacher({ resource, open, onClose }: { resource: ResourceDetail; open: boolean; onClose: () => void }) {
+  const { data: teachers } = useQuery({ queryKey: ['teachers'], queryFn: () => api.get<Teacher[]>('/teachers').then((r) => r.data), enabled: open, staleTime: 300000 })
+  const ask = useMutation({
+    mutationFn: (body: { teacher: string; start: string; end: string; note: string }) => api.post<{ sent_to: string }>(`/resources/${resource.id}/ask-teacher`, body).then((r) => r.data),
+    onSuccess: (d) => {
+      toast.success(`Sent to ${d.sent_to}`, { description: 'They get a notification with a link to book it for you.' })
+      onClose()
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+  const tomorrow = format(new Date(Date.now() + 86400000), 'yyyy-MM-dd')
+  return (
+    <Modal open={open} onClose={onClose}>
+      <form
+        className="col"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const f = new FormData(e.currentTarget)
+          const day = String(f.get('day'))
+          ask.mutate({
+            teacher: String(f.get('teacher')),
+            start: new Date(`${day}T${f.get('from')}`).toISOString(),
+            end: new Date(`${day}T${f.get('to')}`).toISOString(),
+            note: String(f.get('note') ?? ''),
+          })
+        }}
+      >
+        <div className="h2">Ask a teacher to book {resource.name}</div>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          {resource.type_name === 'Laboratory' ? 'Labs' : `${resource.type_name}s`} are booked by faculty. Your teacher gets a notification with this slot ready to book.
+        </p>
+        <label className="field">
+          <span>Teacher</span>
+          <Select name="teacher" required defaultValue={teachers?.[0]?.id ?? ''} key={teachers?.length ?? 0}>
+            {teachers?.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}{t.department ? ` · ${t.department}` : ''}</option>
+            ))}
+          </Select>
+        </label>
+        <div className="grid" style={{ gridTemplateColumns: '1.3fr 1fr 1fr', gap: 10 }}>
+          <label className="field"><span>Day</span><input name="day" type="date" className="input" defaultValue={tomorrow} min={format(new Date(), 'yyyy-MM-dd')} required /></label>
+          <label className="field"><span>From</span><input name="from" type="time" className="input" defaultValue="14:00" required /></label>
+          <label className="field"><span>Until</span><input name="to" type="time" className="input" defaultValue="15:00" required /></label>
+        </div>
+        <textarea name="note" className="input" maxLength={300} placeholder="Why you need it, e.g. finishing the CSE408 project with my group" />
+        <button className="key key-amber" disabled={ask.isPending || !teachers?.length}>
+          <ChalkboardTeacher weight="bold" /> {ask.isPending ? 'Sending…' : 'Send request'}
+        </button>
+      </form>
+    </Modal>
+  )
+}
+
 /** Clicking a slot that's taken: never a dead end. Offers the waitlist, the same time elsewhere, and the next free time here. */
 function TakenDrawer({ taken, resource, onClose }: { taken: Taken | null; resource: ResourceDetail; onClose: () => void }) {
   const start = taken?.start.toISOString()
@@ -363,6 +419,8 @@ export default function ResourcePage() {
   const [img, setImg] = useState(0)
   const [report, setReport] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [params, setParams] = useSearchParams()
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 760
 
   const { data: r, isError } = useQuery({ queryKey: ['resource', id], queryFn: () => api.get<ResourceDetail>(`/resources/${id}`).then((x) => x.data), retry: retryUnlessMissing })
@@ -408,6 +466,19 @@ export default function ResourcePage() {
     }
     setSlot({ start: s.start, end: s.end })
   }
+
+  // A teacher arriving from a student's request (?start=…&end=…): open the booking form on that slot.
+  useEffect(() => {
+    const from = params.get('start')
+    const to = params.get('end')
+    if (!r || !from || !to) return
+    setParams({}, { replace: true })
+    const s = new Date(from)
+    const e = new Date(to)
+    if (r.can_book === false || !(s > new Date() && e > s)) return
+    setSlot({ start: s, end: e })
+    calRef.current?.getApi().gotoDate(s)
+  }, [r]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showQr = async () => setQr(await blobUrl(qrPath(`/resources/${id}/qr`)))
   const [maintOpen, setMaintOpen] = useState(false)
@@ -557,8 +628,13 @@ export default function ResourcePage() {
             <div>
               <div className="h2">{canBook ? 'Pick a slot' : 'When it is free'}</div>
               <div className="muted" style={{ fontSize: 13 }}>
-                {canBook ? 'Drag across the free time. Classes, maintenance and other bookings are locked.' : `View only. ${staffOnly} Ask your teacher if you need it.`}
+                {canBook ? 'Drag across the free time. Classes, maintenance and other bookings are locked.' : `View only. ${staffOnly}`}
               </div>
+              {!canBook && r.status === 'active' && (
+                <button className="key key-amber key-sm" style={{ marginTop: 10 }} onClick={() => setAsking(true)}>
+                  <ChalkboardTeacher size={15} weight="bold" /> Ask a teacher to book it
+                </button>
+              )}
             </div>
             <div className="legend">
               <span><i className="lg-free" /> Free</span>
@@ -602,7 +678,7 @@ export default function ResourcePage() {
                 const day = (info.date.getDay() + 6) % 7
                 const time = format(info.date, 'HH:mm')
                 const open = av?.rules.some((r) => r.weekdays.includes(day) && r.open.slice(0, 5) <= time && time < r.close.slice(0, 5))
-                if (!canBook) toast.info('View only', { description: `${staffOnly} Ask your teacher if you need it.` })
+                if (!canBook) toast.info('View only', { description: `${staffOnly} Use “Ask a teacher to book it” above.` })
                 else if (!open) toast.info('Closed at that time', { description: 'Pick a time inside the white opening hours.' })
               }}
               datesSet={(d) => setRange({ from: format(d.start, 'yyyy-MM-dd'), to: format(d.end, 'yyyy-MM-dd') })}
@@ -687,6 +763,7 @@ export default function ResourcePage() {
       </div>
 
       <TakenDrawer taken={taken} resource={r} onClose={() => setTaken(null)} />
+      {!canBook && <AskTeacher resource={r} open={asking} onClose={() => setAsking(false)} />}
       <BookingDrawer resource={r} slot={slot} onClose={() => setSlot(null)} />
 
       <Modal open={maintOpen} onClose={() => setMaintOpen(false)} width={500}>

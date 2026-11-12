@@ -28,6 +28,9 @@ The demo has 32 resources across 7 types: classrooms, laboratories, equipment, s
 - QR pass for each booking. Any phone camera can scan it to see whether the booking is valid right now, and staff can check the booker in from there
 - Check-in by scanning the poster on the room door
 - Waitlist for a taken slot, with a notification if it opens up
+- **Study spots:** empty classrooms and labs right now (or later today or tomorrow), and how long each stays free, for sitting in between classes
+- **Ask a teacher:** on a lab or classroom, a student sends a request to a teacher, who gets a link with the slot already filled in
+- **Share pass:** send a booking pass to the people you booked with, so any of them can show it at the door
 - Similar rooms that are free at the same time as a taken slot
 - Hourly chart on each room showing when it is usually quiet
 - Saved rooms, a personal calendar and calendar export (`.ics` file or iCal feed)
@@ -192,7 +195,7 @@ cd backend
 python manage.py test
 ```
 
-There are 282 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
+There are 291 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
 
 | Requirement | Where it is checked |
 |---|---|

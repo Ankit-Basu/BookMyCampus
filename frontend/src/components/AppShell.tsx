@@ -1,4 +1,5 @@
 import {
+  Books,
   Bell,
   CaretDown,
   ChartPieSlice,
@@ -238,10 +239,13 @@ export default function AppShell() {
       { to: '/bookings', label: 'Bookings', icon: Ticket },
       { to: '/scan', label: 'Scan', icon: QrCode },
     ]
-    if (user?.is_manager) {
-      base.push({ to: '/approvals', label: 'Approvals', icon: Stamp })
-      base.push({ to: '/admin', label: 'Control room', icon: ChartPieSlice })
+    if (!user?.is_manager) {
+      // Students and faculty: empty rooms to study in. Second, so it stays in the phone tab bar.
+      base.splice(1, 0, { to: '/study', label: 'Study', icon: Books })
+      return base
     }
+    base.push({ to: '/approvals', label: 'Approvals', icon: Stamp })
+    base.push({ to: '/admin', label: 'Control room', icon: ChartPieSlice })
     return base
   }, [user?.is_manager])
 
