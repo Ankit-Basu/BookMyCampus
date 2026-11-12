@@ -100,7 +100,7 @@ function BookingDrawer({
   })
 
   if (!slot) return <Drawer open={false} onClose={onClose} title="">{null}</Drawer>
-  const needsApproval = resource.requires_approval || (forClass && user?.role === 'student')
+  const needsApproval = resource.requires_approval
   return (
     <Drawer open={!!slot} onClose={onClose} title={result ? 'Series booked' : 'Reserve this slot'}>
       {result ? (
@@ -147,13 +147,15 @@ function BookingDrawer({
               <div className="eyebrow">{durationLabel(slot.start.toISOString(), slot.end.toISOString())}</div>
             </div>
           </div>
-          <div className="seg audience" role="group" aria-label="Who is this booking for">
-            <button type="button" className={forClass ? '' : 'on'} onClick={() => setForClass(false)}><User size={15} /> Just me</button>
-            <button type="button" className={forClass ? 'on' : ''} onClick={() => setForClass(true)}><GraduationCap size={15} /> For a class</button>
-          </div>
+          {user?.can_book_recurring && (
+            <div className="seg audience" role="group" aria-label="Who is this booking for">
+              <button type="button" className={forClass ? '' : 'on'} onClick={() => setForClass(false)}><User size={15} /> Just me</button>
+              <button type="button" className={forClass ? 'on' : ''} onClick={() => setForClass(true)}><GraduationCap size={15} /> For a class</button>
+            </div>
+          )}
           {needsApproval && (
             <div className="notice">
-              <Stamp size={18} color="var(--brand)" /> {resource.requires_approval ? 'This needs approval.' : 'Class bookings go to your HOD.'} The slot is held for you the moment you submit.
+              <Stamp size={18} color="var(--brand)" /> This needs approval. The slot is held for you the moment you submit.
             </div>
           )}
           <label className="field">

@@ -29,8 +29,9 @@ export function ServerWaking() {
 function AuthStats() {
   const { data } = usePublicStats()
   const tiles = [
-    { v: data?.resources ?? '–', l: 'spaces to book' },
-    { v: data?.bookings_30d ?? '–', l: 'bookings this month' },
+    // demo-data figures until the backend answers, so the page never looks empty
+    { v: data?.resources ?? 32, l: 'spaces to book' },
+    { v: data?.bookings_30d ?? 1552, l: 'bookings this month' },
     { v: 0, l: 'double bookings, ever' },
   ]
   return (

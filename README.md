@@ -22,7 +22,7 @@ The demo has 32 resources across 7 types: classrooms, laboratories, equipment, s
 
 - Search and filter resources by type, block and capacity, or show only what is free this hour
 - Room calendar that already shows classes from the timetable, maintenance and other bookings
-- Book for yourself or for a class. A student's class booking always needs HOD approval
+- Students book for themselves. Faculty can also book for a whole class
 - QR pass for each booking, with check-in by scanning the poster on the room door
 - Waitlist for a taken slot, with a notification if it opens up
 - Similar rooms that are free at the same time as a taken slot
@@ -112,10 +112,10 @@ New students can also register at `/register` with their 8-digit registration nu
 
 To see the main flow:
 
-1. Sign in as Student, open a room and click a free slot.
-2. Choose **For a class**, enter a class such as `K22CS-B` and send the request.
-3. Sign in as HOD, open **Approvals** and approve it.
-4. Sign in as Student again. The booking is now confirmed, with a QR pass.
+1. Sign in as Student, open a laboratory and click a free slot. A student's lab booking needs HOD approval, so it is sent as a request.
+2. Sign in as HOD, open **Approvals** and approve it.
+3. Sign in as Student again. The booking is now confirmed, with a QR pass.
+4. Sign in as Faculty to book a room **For a class**, such as `K22CS-B`. Only teaching staff can book for a class.
 
 ## Tech stack
 

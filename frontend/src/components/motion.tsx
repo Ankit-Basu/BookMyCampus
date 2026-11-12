@@ -123,19 +123,23 @@ export function Tilt({ children, className, style, max = 7 }: { children: ReactN
 /** Number that counts up (GSAP-driven) the first time it scrolls into view. */
 export function Counter({ to, duration = 1.4 }: { to: number; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null)
+  // When the target changes (sample figures replaced by live ones), count on from where it is.
+  const shown = useRef(0)
   useEffect(() => {
     const el = ref.current
     if (!el) return
     if (reduced()) {
       el.textContent = to.toLocaleString('en-IN')
+      shown.current = to
       return
     }
-    const obj = { v: 0 }
+    const obj = { v: shown.current }
     const tween = gsap.to(obj, {
       v: to,
       duration,
       ease: 'power3.out',
       onUpdate: () => {
+        shown.current = obj.v
         el.textContent = Math.round(obj.v).toLocaleString('en-IN')
       },
       scrollTrigger: { trigger: el, start: 'top 95%', once: true },

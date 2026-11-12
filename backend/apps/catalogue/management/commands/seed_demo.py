@@ -312,7 +312,7 @@ class Command(BaseCommand):
         wf("Students in classrooms", "Classroom", [Role.STUDENT], [("HOD approval", Role.DEPT_HEAD)])
         wf("Seminar hall events", "Seminar Hall", [], [("HOD approval", Role.DEPT_HEAD)])
         wf("Vehicle requisition", "Vehicle", [], [("HOD approval", Role.DEPT_HEAD)])
-        wf("Student lab access", "Laboratory", [Role.STUDENT], [("Lab custodian", Role.CUSTODIAN)])
+        wf("Student lab access", "Laboratory", [Role.STUDENT], [("HOD approval", Role.DEPT_HEAD)])
 
     # ------------------------------------------------------------------ consumables
     def consumables(self):

@@ -23,6 +23,8 @@ from .factories import at, make_campus, make_user
 
 
 class ClassBookingTest(APITestCase):
+    """Booking for a whole class is for teaching staff. Students book for themselves."""
+
     def setUp(self):
         self.dept, self.rtype, self.lab, _ = make_campus()
         self.student = make_user("stud", Role.STUDENT, self.dept)
@@ -31,45 +33,41 @@ class ClassBookingTest(APITestCase):
         self.dept.head = self.hod
         self.dept.save()
 
-    def book(self, user, on_behalf_of="", lab=None):
+    def book(self, user, on_behalf_of="", hour=10):
         self.client.force_authenticate(user)
         return self.client.post("/api/bookings", {
-            "resource": (lab or self.lab).id, "start": at(2, 10), "end": at(2, 11), "title": "Session", "on_behalf_of": on_behalf_of,
+            "resource": self.lab.id, "start": at(2, hour), "end": at(2, hour + 1), "title": "Session", "on_behalf_of": on_behalf_of,
         }, format="json")
 
     def test_personal_booking_is_instant_where_no_workflow_applies(self):
         self.assertEqual(self.book(self.student).data["status"], "confirmed")
 
-    def test_student_class_booking_needs_the_hod_who_can_then_approve_it(self):
+    def test_students_cannot_book_for_a_class(self):
         r = self.book(self.student, "K22CS-B")
-        self.assertEqual(r.status_code, 201)
-        self.assertEqual((r.data["status"], r.data["on_behalf_of"]), ("pending", "K22CS-B"))
+        self.assertEqual((r.status_code, r.data["error"]), (422, "class_booking_staff_only"))
+        self.assertFalse(Booking.objects.exists())
+
+    def test_blank_class_name_is_still_a_personal_booking(self):
+        self.assertEqual(self.book(self.student, "   ").data["status"], "confirmed")
+
+    def test_faculty_can_book_for_a_class(self):
+        r = self.book(self.faculty, "K22CS-B")
+        self.assertEqual((r.status_code, r.data["status"], r.data["on_behalf_of"]), (201, "confirmed", "K22CS-B"))
+
+    def test_student_lab_request_goes_to_the_hod_who_can_approve_it(self):
+        wf = ApprovalWorkflow.objects.create(name="Student lab access", resource_type=self.rtype, requester_roles=[Role.STUDENT])
+        ApprovalStep.objects.create(workflow=wf, order=1, name="HOD approval", approver_role=Role.DEPT_HEAD)
+        r = self.book(self.student)
+        self.assertEqual(r.data["status"], "pending")
         self.assertTrue(Notification.objects.filter(user=self.hod, kind=Notification.Kind.APPROVAL_REQUIRED).exists())
+
+        self.client.force_authenticate(make_user("other", Role.STUDENT, self.dept))
+        self.assertEqual(self.client.post(f"/api/bookings/{r.data['id']}/approve", {}, format="json").status_code, 403)
 
         self.client.force_authenticate(self.hod)
         self.assertEqual([b["id"] for b in self.client.get("/api/approvals/queue").data], [r.data["id"]])
         self.assertEqual(self.client.post(f"/api/bookings/{r.data['id']}/approve", {}, format="json").status_code, 200)
         self.assertEqual(Booking.objects.get(pk=r.data["id"]).status, "confirmed")
-
-    def test_blank_class_name_is_still_a_personal_booking(self):
-        self.assertEqual(self.book(self.student, "   ").data["status"], "confirmed")
-
-    def test_faculty_class_booking_follows_the_normal_rules(self):
-        self.assertEqual(self.book(self.faculty, "K22CS-B").data["status"], "confirmed")
-
-    def test_student_cannot_approve(self):
-        r = self.book(self.student, "K22CS-B")
-        self.client.force_authenticate(make_user("other", Role.STUDENT, self.dept))
-        self.assertEqual(self.client.post(f"/api/bookings/{r.data['id']}/approve", {}, format="json").status_code, 403)
-
-    def test_without_any_hod_the_request_is_not_stranded(self):
-        nobody = Department.objects.create(code="X", name="No head")
-        lab = Resource.objects.create(type=self.rtype, code="LAB-X", name="Lab X", capacity=10, department=nobody)
-        student = make_user("lonely", Role.STUDENT, nobody)
-        manager = make_user("mgr", Role.FACILITY_MANAGER, nobody)
-        r = self.book(student, "K22CS-B", lab)
-        self.client.force_authenticate(manager)
-        self.assertEqual([b["id"] for b in self.client.get("/api/approvals/queue").data], [r.data["id"]])
 
 
 class HodRoutingTest(APITestCase):

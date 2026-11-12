@@ -43,6 +43,20 @@ const FALLBACK_TYPES: Stats['types'] = [
   { name: 'Vehicle', slug: 'vehicle', color: '#E66BD3', icon: 'van', count: 0, description: 'Campus transport for field trips and official travel.', cover: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=1200&q=70&auto=format&fit=crop' },
 ]
 
+// Shown until the backend answers, so a sleeping server never leaves the page looking empty.
+// Taken from the demo data; replaced by live numbers as soon as they arrive.
+const SAMPLE_STATS: Stats = {
+  resources: 32,
+  types: FALLBACK_TYPES,
+  bookings_30d: 1552,
+  conflicts_blocked: 556,
+  double_bookings: 0,
+  utilisation: 0.1838,
+  idle_value_inr: 91174623,
+  idle_top: {"name": "Central Auditorium", "code": "SH-AUD-1", "value_inr": 25000000, "utilisation": 0.1404, "image": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=70&auto=format&fit=crop", "type": "Seminar Hall"},
+  names: [],
+}
+
 const FLAP_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789&-·' "
 const FALLBACK = ['AI & DEEP LEARNING LAB', 'CONFOCAL MICROSCOPE', 'FOOTBALL TURF', 'CSE SEMINAR HALL', 'BADMINTON HALL A', '52-SEATER COACH']
 const flapName = (n: string) => n.toUpperCase().slice(0, 24)
@@ -443,6 +457,7 @@ export default function Landing() {
   const { user } = useAuth()
   const { mode, palette } = useTheme()
   const { data } = useQuery({ queryKey: ['public-stats'], queryFn: () => api.get<Stats>('/public/stats').then((r) => r.data), retry: 12, retryDelay: 6000 })
+  const shown = data ?? SAMPLE_STATS
   const hero = useRef<HTMLDivElement>(null)
   const belowFold = useBelowFold()
   // Compiling the burst's shader stalls the page, so the rays wait until the hero's entrance has finished.
@@ -469,12 +484,12 @@ export default function Landing() {
 
   const cta = user ? '/explore' : '/login'
   const stats: { v: number; l: string }[] = [
-    { v: data?.resources ?? 0, l: 'bookable resources' },
-    { v: data?.types.length ?? 0, l: 'resource types' },
-    { v: data?.bookings_30d ?? 0, l: 'bookings in 30 days' },
-    { v: data?.conflicts_blocked ?? 0, l: 'clashes refused by the database' },
+    { v: shown.resources, l: 'bookable resources' },
+    { v: shown.types.length, l: 'resource types' },
+    { v: shown.bookings_30d, l: 'bookings in 30 days' },
+    { v: shown.conflicts_blocked, l: 'clashes refused by the database' },
   ]
-  const marquee = data?.names ?? []
+  const marquee = shown.names
 
   return (
     <div className="landing">
@@ -544,7 +559,7 @@ export default function Landing() {
         <div className="stats-grid">
           {stats.map((s) => (
             <div key={s.l} data-reveal className="stat-big glass">
-              <span className="display">{data ? <Counter to={s.v} duration={1.5} /> : '–'}</span>
+              <span className="display"><Counter to={s.v} duration={1.5} /></span>
               <span className="stat-label">{s.l}</span>
             </div>
           ))}
@@ -558,7 +573,7 @@ export default function Landing() {
       {belowFold ? (
         <>
           <RaceScene />
-          <TypeRail types={data?.types ?? FALLBACK_TYPES} />
+          <TypeRail types={shown.types} />
 
           <section id="features" className="page features">
             <Reveal>
@@ -566,7 +581,7 @@ export default function Landing() {
               <h2 className="display section-title" data-reveal>Built for how LPU <em>actually</em> runs.</h2>
               <p className="hand" data-reveal style={{ marginTop: 6 }}>(no, really. it knows your timetable.)</p>
             </Reveal>
-            <FeatureBento stats={data} />
+            <FeatureBento stats={shown} />
           </section>
 
           <section className="page final-cta">

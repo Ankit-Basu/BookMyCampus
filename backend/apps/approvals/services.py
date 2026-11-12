@@ -88,27 +88,6 @@ def attach_workflow(booking, workflow):
     )
 
 
-def attach_class_signoff(booking):
-    """A student booking for a whole class always needs a sign-off, even where a personal booking is instant."""
-    has_hod = bool(approvers_for(booking.resource, Role.DEPT_HEAD, booking.user))
-    approval = Approval.objects.create(
-        booking=booking,
-        order=1,
-        step_name="HOD approval" if has_hod else "Facility manager approval",
-        approver_role=Role.DEPT_HEAD if has_hod else Role.FACILITY_MANAGER,
-    )
-    _activate(approval)
-    notify(
-        booking.user,
-        Notification.Kind.APPROVAL_REQUIRED,
-        f"Request sent: {booking.resource.name}",
-        f"Your slot for {booking.on_behalf_of} is held while it goes for {approval.step_name.lower()}.",
-        booking=booking,
-        link=f"/bookings/{booking.id}",
-        email=False,
-    )
-
-
 def queue_for(user):
     """Pending approvals this user is entitled to decide."""
     qs = Approval.objects.filter(status=Approval.Status.PENDING, booking__status="pending").select_related(

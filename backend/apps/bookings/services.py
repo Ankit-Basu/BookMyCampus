@@ -18,7 +18,7 @@ from django.db.models import Q
 from django.utils import timezone
 from psycopg.types.range import Range
 
-from apps.accounts.models import Role, User
+from apps.accounts.models import User
 from apps.notifications.models import Notification
 from apps.notifications.services import notify
 from apps.rules.models import Policy
@@ -68,13 +68,12 @@ def _insert(user, resource, start, end, *, title, purpose="", on_behalf_of="", a
     Insert booking + ledger slot inside a savepoint. Raises SlotConflict if PostgreSQL refuses.
     Callers must already be inside transaction.atomic().
     """
-    from apps.approvals.services import attach_class_signoff, attach_workflow, resolve_workflow
+    from apps.approvals.services import attach_workflow, resolve_workflow
 
     workflow = resolve_workflow(resource, user)
-    class_signoff = not workflow and user.role == Role.STUDENT and bool(on_behalf_of.strip())
     for attempt in range(DEADLOCK_RETRIES):
         try:
-            booking = _claim(user, resource, start, end, workflow or class_signoff, title=title, purpose=purpose,
+            booking = _claim(user, resource, start, end, workflow, title=title, purpose=purpose,
                              on_behalf_of=on_behalf_of, attendees=attendees, recurrence=recurrence, index=index)
             break
         except OperationalError as exc:
@@ -87,8 +86,6 @@ def _insert(user, resource, start, end, *, title, purpose="", on_behalf_of="", a
             time.sleep(random.uniform(0, min(0.4, 0.01 * 2**attempt)))
     if workflow:
         attach_workflow(booking, workflow)
-    elif class_signoff:
-        attach_class_signoff(booking)
     return booking
 
 
@@ -132,6 +129,9 @@ def _announce(booking):
 
 def create_booking(user, resource, start, end, *, title, purpose="", on_behalf_of="", attendees=1):
     try:
+        # Booking for a whole class is for teaching staff. Students book for themselves.
+        if on_behalf_of.strip() and not user.can_book_recurring:
+            raise RuleViolation("class_booking_staff_only", "Only faculty can book for a class.")
         validate_request(user, resource, start, end, attendees, check_quota=False)
         with transaction.atomic():
             # Serialise quota checks per user (cheap row lock). Slot correctness does not need it.
