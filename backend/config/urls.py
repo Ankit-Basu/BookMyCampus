@@ -9,7 +9,7 @@ from apps.accounts import views as accounts
 from apps.analytics import views as analytics
 from apps.approvals import views as approvals
 from apps.bookings import views as bookings
-from apps.catalogue import student
+from apps.catalogue import student, teaching
 from apps.catalogue import views as catalogue
 from apps.consumables import views as consumables
 from apps.maintenance import views as maintenance
@@ -52,6 +52,11 @@ api = [
     path("study-spots", student.study_spots),
     path("teachers", student.teachers),
     path("resources/<int:pk>/ask-teacher", student.ask_teacher),
+    path("teacher-requests", student.teacher_requests),
+    path("teacher-requests/<int:pk>/decline", student.decline_request),
+    path("teacher-requests/<int:pk>/fulfil", student.fulfil_request),
+    path("teaching/week", teaching.teaching_week),
+    path("teaching/makeup", teaching.makeup_slots),
     path("health", analytics.health),
     path("public/stats", analytics.public_stats),
     path("system/health", analytics.system_health),

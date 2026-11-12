@@ -37,6 +37,12 @@ The demo has 32 resources across 7 types: classrooms, laboratories, equipment, s
 - Campus map showing how much of each block is free
 - Faculty can also repeat a booking weekly
 
+**Faculty (Teaching tab)**
+
+- My week: their timetabled classes and their own bookings for the next seven days
+- Make-up class finder: pick a section, length and class size, and it suggests times when the section has no class, the teacher is free and a classroom that fits is empty. One click opens the booking form filled in for that class
+- Student requests: requests from students to book a lab or classroom, with Book it (the slot is filled in) and Decline. The student is told either way
+
 **HOD**
 
 - Approval queue for requests from their department and for rooms their department owns
@@ -195,7 +201,7 @@ cd backend
 python manage.py test
 ```
 
-There are 291 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
+There are 302 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
 
 | Requirement | Where it is checked |
 |---|---|

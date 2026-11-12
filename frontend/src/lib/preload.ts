@@ -11,6 +11,7 @@ export const pages = {
   booking: () => import('../pages/BookingPage'),
   scan: () => import('../pages/Scan'),
   study: () => import('../pages/Study'),
+  teaching: () => import('../pages/Teaching'),
   map: () => import('../pages/CampusMap'),
   profile: () => import('../pages/Profile'),
   approvals: () => import('../pages/Approvals'),

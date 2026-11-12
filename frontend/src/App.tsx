@@ -16,6 +16,7 @@ const MyBookings = lazy(pages.bookings)
 const BookingPage = lazy(pages.booking)
 const Scan = lazy(pages.scan)
 const Study = lazy(pages.study)
+const Teaching = lazy(pages.teaching)
 const Approvals = lazy(pages.approvals)
 const CampusMap = lazy(pages.map)
 const Profile = lazy(pages.profile)
@@ -27,6 +28,11 @@ function RequireAuth() {
   if (!ready) return <Splash />
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   return <AppShell />
+}
+
+function StaffOnly({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  return user?.can_book_recurring ? <>{children}</> : <Navigate to="/explore" replace />
 }
 
 function ManagerOnly({ children }: { children: ReactNode }) {
@@ -76,6 +82,7 @@ export default function App() {
               <Route path="/bookings/:id" element={<BookingPage />} />
               <Route path="/scan" element={<Scan />} />
               <Route path="/study" element={<Study />} />
+              <Route path="/teaching" element={<StaffOnly><Teaching /></StaffOnly>} />
               <Route path="/map" element={<CampusMap />} />
               <Route path="/me" element={<Profile />} />
               <Route path="/approvals" element={<ManagerOnly><Approvals /></ManagerOnly>} />

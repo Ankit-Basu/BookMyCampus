@@ -121,3 +121,28 @@ class Custodian(models.Model):
 
     class Meta:
         unique_together = [("resource", "user")]
+
+
+class TeacherRequest(models.Model):
+    """A student asking a teacher to book a room only staff can book (a lab or classroom)."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting"
+        BOOKED = "booked", "Booked"
+        DECLINED = "declined", "Declined"
+
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="teacher_requests_sent")
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="teacher_requests")
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="teacher_requests")
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    note = models.CharField(max_length=300, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reply = models.CharField(max_length=200, blank=True)
+    booking = models.ForeignKey("bookings.Booking", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["teacher", "status"])]

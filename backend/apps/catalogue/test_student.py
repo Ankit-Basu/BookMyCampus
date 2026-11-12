@@ -80,6 +80,12 @@ class AskTeacherTest(APITestCase):
         self.assertEqual(self.ask(end=at(2, 13).isoformat()).data["error"], "invalid_period")
         self.assertEqual(self.ask(end=at(2, 20).isoformat()).data["error"], "too_long")
 
+    def test_cannot_ask_for_a_time_the_room_is_taken(self):
+        _insert(self.teacher, self.lab, at(2, 14), at(2, 15), title="Practical")
+        r = self.ask()
+        self.assertEqual((r.status_code, r.data["error"]), (409, "slot_taken"))
+        self.assertIn("has a booking then", r.data["message"])
+
     def test_ten_requests_a_day(self):
         for _ in range(10):
             self.assertEqual(self.ask().status_code, 201)

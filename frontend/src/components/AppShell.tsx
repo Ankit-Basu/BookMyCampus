@@ -1,5 +1,6 @@
 import {
   Books,
+  ChalkboardTeacher,
   Bell,
   CaretDown,
   ChartPieSlice,
@@ -239,15 +240,16 @@ export default function AppShell() {
       { to: '/bookings', label: 'Bookings', icon: Ticket },
       { to: '/scan', label: 'Scan', icon: QrCode },
     ]
-    if (!user?.is_manager) {
-      // Students and faculty: empty rooms to study in. Second, so it stays in the phone tab bar.
-      base.splice(1, 0, { to: '/study', label: 'Study', icon: Books })
-      return base
-    }
+    const teaching: NavEntry = { to: '/teaching', label: 'Teaching', icon: ChalkboardTeacher }
+    const study: NavEntry = { to: '/study', label: 'Study', icon: Books }
+    // The first four also make the phone tab bar.
+    const [explore, map, bookings, scan] = base
+    if (!user?.is_manager) return user?.can_book_recurring ? [explore, teaching, bookings, scan, study, map] : [explore, study, bookings, scan, map]
     base.push({ to: '/approvals', label: 'Approvals', icon: Stamp })
     base.push({ to: '/admin', label: 'Control room', icon: ChartPieSlice })
+    base.push(teaching)
     return base
-  }, [user?.is_manager])
+  }, [user?.is_manager, user?.can_book_recurring])
 
   const isActive = (to: string) => pathname === to || pathname.startsWith(to + '/') || (to === '/explore' && pathname.startsWith('/resources'))
   const pending = queue?.length ?? 0

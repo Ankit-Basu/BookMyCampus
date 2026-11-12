@@ -21,6 +21,8 @@ import type { Availability, Booking, Resource, ResourceDetail } from '../lib/typ
 import { qrPath } from '../lib/shareOrigin'
 
 type Consumable = { id: number; name: string; kind: string; unit: string; stock: number }
+/** A chosen time, optionally pre-filled from a link (a student's request or the make-up class finder). */
+type Slot = { start: Date; end: Date; prefill?: { title?: string; forClass?: string; size?: number; request?: number } }
 
 
 /** What people usually book each type for, as the title placeholder. */
@@ -37,14 +39,16 @@ function BookingDrawer({
   onClose,
 }: {
   resource: ResourceDetail
-  slot: { start: Date; end: Date } | null
+  slot: Slot | null
   onClose: () => void
 }) {
   const { user } = useAuth()
   const qc = useQueryClient()
   const nav = useNavigate()
   const [title, setTitle] = useState('')
-  const [attendees, setAttendees] = useState(1)
+  // Kept as typed, so the box can be cleared and retyped without a stuck leading 0.
+  const [attendees, setAttendees] = useState('1')
+  const people = Math.min(Math.max(parseInt(attendees, 10) || 1, 1), resource.capacity)
   const [purpose, setPurpose] = useState('')
   const [forClass, setForClass] = useState(false)
   const [onBehalf, setOnBehalf] = useState('')
@@ -65,8 +69,15 @@ function BookingDrawer({
     if (slot) {
       setResult(null)
       setDays([(slot.start.getDay() + 6) % 7])
+      const p = slot.prefill
+      if (p?.title) setTitle(p.title)
+      if (p?.forClass) {
+        setForClass(true)
+        setOnBehalf(p.forClass)
+      }
+      if (p?.size) setAttendees(String(Math.min(p.size, resource.capacity)))
     }
-  }, [slot])
+  }, [slot]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const book = useMutation({
     mutationFn: () =>
@@ -78,7 +89,7 @@ function BookingDrawer({
           title: title || `${resource.name} booking`,
           purpose,
           on_behalf_of: forClass ? onBehalf.trim() : '',
-          attendees,
+          attendees: people,
           recurrence: recurring ? { freq: 'weekly', interval: 1, weekdays: days, count, conflict_policy: policy } : null,
           accessories: Object.entries(acc).filter(([, q]) => q > 0).map(([id, quantity]) => ({ id: Number(id), quantity })),
         })
@@ -90,7 +101,10 @@ function BookingDrawer({
         setResult(data)
         toast.success(`${data.created.length} of ${data.requested} dates booked`)
       } else {
-        toast.success(data.status === 'pending' ? 'Request sent — slot held while it’s approved' : `Booked! Ref ${data.reference}`)
+        const req = slot?.prefill?.request
+        // Booked from a student's request: link it, and the student is told.
+        if (req) api.post(`/teacher-requests/${req}/fulfil`, { booking: data.id }).then(() => qc.invalidateQueries({ queryKey: ['teacher-requests'] })).catch(() => undefined)
+        toast.success(data.status === 'pending' ? 'Request sent — slot held while it’s approved' : `Booked! Ref ${data.reference}`, req ? { description: 'The student has been told.' } : undefined)
         onClose()
         nav(`/bookings/${data.id}`)
       }
@@ -175,7 +189,16 @@ function BookingDrawer({
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <label className="field">
               <span>People (max {resource.capacity})</span>
-              <input className="input" type="number" min={1} max={resource.capacity} value={attendees} onChange={(e) => setAttendees(Number(e.target.value))} />
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={resource.capacity}
+                value={attendees}
+                onChange={(e) => setAttendees(e.target.value.replace(/^0+(?=\d)/, ''))}
+                onBlur={() => setAttendees(String(people))}
+              />
             </label>
             {forClass && (
               <label className="field">
@@ -414,7 +437,7 @@ export default function ResourcePage() {
   const calRef = useRef<FullCalendar>(null)
   // Same first week FullCalendar opens on, so the hover-prefetch from Explore is a cache hit.
   const [range, setRange] = useState(initialWeek)
-  const [slot, setSlot] = useState<{ start: Date; end: Date } | null>(null)
+  const [slot, setSlot] = useState<Slot | null>(null)
   const [taken, setTaken] = useState<Taken | null>(null)
   const [img, setImg] = useState(0)
   const [report, setReport] = useState(false)
@@ -467,16 +490,22 @@ export default function ResourcePage() {
     setSlot({ start: s.start, end: s.end })
   }
 
-  // A teacher arriving from a student's request (?start=…&end=…): open the booking form on that slot.
+  // Arriving from a student's request or the make-up finder (?start=…&end=…): open the booking form on that slot.
   useEffect(() => {
     const from = params.get('start')
     const to = params.get('end')
     if (!r || !from || !to) return
+    const prefill = {
+      title: params.get('title') ?? undefined,
+      forClass: params.get('for') ?? undefined,
+      size: Number(params.get('size')) || undefined,
+      request: Number(params.get('request')) || undefined,
+    }
     setParams({}, { replace: true })
     const s = new Date(from)
     const e = new Date(to)
     if (r.can_book === false || !(s > new Date() && e > s)) return
-    setSlot({ start: s, end: e })
+    setSlot({ start: s, end: e, prefill })
     calRef.current?.getApi().gotoDate(s)
   }, [r]) // eslint-disable-line react-hooks/exhaustive-deps
 

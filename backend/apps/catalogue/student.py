@@ -3,8 +3,8 @@ Things students need beyond booking: finding an empty room to sit and study in, 
 to book a lab or classroom, since only staff can book those.
 """
 from datetime import timedelta
+from urllib.parse import urlencode
 
-from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -14,12 +14,12 @@ from rest_framework.response import Response
 
 from apps.accounts.models import Role, User
 from apps.bookings.exceptions import BookingError
-from apps.bookings.models import BookingSlot
+from apps.bookings.models import Booking, BookingSlot
 from apps.notifications.models import Notification
 from apps.notifications.services import notify
 from apps.rules.services import blackouts_for, open_windows, rules_for, subtract
 
-from .models import Resource
+from .models import Resource, TeacherRequest
 
 STUDY_TYPES = ["Classroom", "Laboratory"]
 MIN_STUDY_MINUTES = 20
@@ -95,6 +95,35 @@ def teachers(request):
     ])
 
 
+def _name(u):
+    return u.get_full_name() or u.username
+
+
+def _when(start, end):
+    local = timezone.localtime(start)
+    return f"{local:%a %d %b}, {local:%H:%M}–{timezone.localtime(end):%H:%M}"
+
+
+def _clash(resource, start, end):
+    """What already occupies the room then (a class, booking or maintenance), or None."""
+    s = BookingSlot.objects.filter(resource=resource, period__overlap=(start, end)).first()
+    if s is None:
+        return None
+    return {"timetable": f"a class ({s.label})", "maintenance": "maintenance"}.get(s.kind, "a booking")
+
+
+def _request_json(r):
+    return {
+        "id": r.id, "status": r.status, "status_label": r.get_status_display(),
+        "student": _name(r.student), "student_username": r.student.username, "teacher": _name(r.teacher),
+        "resource": {"id": r.resource_id, "name": r.resource.name, "type_name": r.resource.type.name},
+        "start": r.start, "end": r.end, "note": r.note, "reply": r.reply, "booking": r.booking_id,
+        "created_at": r.created_at, "expired": r.status == TeacherRequest.Status.PENDING and r.start <= timezone.now(),
+        # The room may have been taken since the student asked.
+        "taken_by": _clash(r.resource, r.start, r.end) if r.status == TeacherRequest.Status.PENDING else None,
+    }
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def ask_teacher(request, pk):
@@ -111,21 +140,73 @@ def ask_teacher(request, pk):
         raise BookingError("slot_passed", "That time has already passed.")
     if end - start > timedelta(hours=4):
         raise BookingError("too_long", "Ask for 4 hours or less.")
-    note = str(request.data.get("note", "")).strip()[:300]
+    clash = _clash(resource, start, end)
+    if clash:
+        raise BookingError("slot_taken", f"{resource.name} has {clash} then. Pick a time when it's free.", http_status=409)
+    since = timezone.now() - timedelta(days=1)
+    if TeacherRequest.objects.filter(student=user, created_at__gte=since).count() >= ASKS_PER_DAY:
+        raise BookingError("too_many_requests", "You've sent 10 requests in the last day. Try again tomorrow.", http_status=429)
 
-    key = f"ask-teacher:{user.pk}:{timezone.localdate()}"
-    sent = cache.get(key, 0)
-    if sent >= ASKS_PER_DAY:
-        raise BookingError("too_many_requests", "You've sent today's 10 requests. Try again tomorrow.", http_status=429)
-    cache.set(key, sent + 1, 60 * 60 * 24)
-
-    who = user.get_full_name() or user.username
-    local = timezone.localtime(start)
-    when = f"{local:%a %d %b}, {local:%H:%M}–{timezone.localtime(end):%H:%M}"
-    query = f"start={start.isoformat().replace('+', '%2B')}&end={end.isoformat().replace('+', '%2B')}"
+    req = TeacherRequest.objects.create(
+        student=user, teacher=teacher, resource=resource, start=start, end=end,
+        note=str(request.data.get("note", "")).strip()[:300],
+    )
+    query = urlencode({
+        "start": start.isoformat(), "end": end.isoformat(), "request": req.id,
+        "title": (f"For {_name(user)}: {req.note}" if req.note else f"For {_name(user)}")[:150],
+    })
     notify(
-        teacher, Notification.Kind.INFO, f"{who} asks you to book {resource.name}",
-        f"{when}." + (f" “{note}”" if note else "") + (f" Registration no. {user.username}." if user.username.isdigit() else ""),
+        teacher, Notification.Kind.INFO, f"{_name(user)} asks you to book {resource.name}",
+        f"{_when(start, end)}." + (f" “{req.note}”" if req.note else "")
+        + (f" Registration no. {user.username}." if user.username.isdigit() else ""),
         link=f"/resources/{resource.id}?{query}",
     )
-    return Response({"sent_to": teacher.get_full_name() or teacher.username}, status=201)
+    return Response({"sent_to": _name(teacher), "request": req.id}, status=201)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def teacher_requests(request):
+    """Requests a teacher has received, and requests a student has sent."""
+    qs = TeacherRequest.objects.select_related("student", "teacher", "resource__type")
+    return Response({
+        "incoming": [_request_json(r) for r in qs.filter(teacher=request.user)[:50]],
+        "sent": [_request_json(r) for r in qs.filter(student=request.user)[:50]],
+    })
+
+
+def _open_request(request, pk):
+    req = get_object_or_404(TeacherRequest.objects.select_related("student", "resource"), pk=pk, teacher=request.user)
+    if req.status != TeacherRequest.Status.PENDING:
+        raise BookingError("already_decided", f"You already {req.get_status_display().lower()} this request.")
+    return req
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def decline_request(request, pk):
+    req = _open_request(request, pk)
+    req.status, req.reply, req.decided_at = TeacherRequest.Status.DECLINED, str(request.data.get("reply", "")).strip()[:200], timezone.now()
+    req.save(update_fields=["status", "reply", "decided_at"])
+    notify(
+        req.student, Notification.Kind.REJECTED, f"{_name(request.user)} can't book {req.resource.name} for you",
+        f"{_when(req.start, req.end)}." + (f" “{req.reply}”" if req.reply else ""), link=f"/resources/{req.resource_id}",
+    )
+    return Response(_request_json(req))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def fulfil_request(request, pk):
+    """The teacher booked the room for the student: link the booking and tell the student."""
+    req = _open_request(request, pk)
+    booking = Booking.objects.filter(pk=request.data.get("booking"), user=request.user, resource=req.resource).first()
+    if booking is None or not booking.is_active:
+        raise BookingError("bad_booking", "That booking isn't yours for this room.")
+    req.status, req.booking, req.decided_at = TeacherRequest.Status.BOOKED, booking, timezone.now()
+    req.save(update_fields=["status", "booking", "decided_at"])
+    notify(
+        req.student, Notification.Kind.APPROVED, f"{_name(request.user)} booked {req.resource.name} for you",
+        f"{_when(booking.start, booking.end)}. Ref {booking.reference}.", link=f"/resources/{req.resource_id}",
+    )
+    return Response(_request_json(req))
