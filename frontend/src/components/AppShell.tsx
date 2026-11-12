@@ -8,7 +8,6 @@ import {
   MagnifyingGlass,
   MapTrifold,
   Moon,
-  QrCode,
   SignOut,
   Stamp,
   Sun,
@@ -238,13 +237,13 @@ export default function AppShell() {
       { to: '/explore', label: 'Explore', icon: MagnifyingGlass },
       { to: '/map', label: 'Map', icon: MapTrifold },
       { to: '/bookings', label: 'Bookings', icon: Ticket },
-      { to: '/scan', label: 'Scan', icon: QrCode },
     ]
     const teaching: NavEntry = { to: '/teaching', label: 'Teaching', icon: ChalkboardTeacher }
     const study: NavEntry = { to: '/study', label: 'Study', icon: Books }
     // The first four also make the phone tab bar.
-    const [explore, map, bookings, scan] = base
-    if (!user?.is_manager) return user?.can_book_recurring ? [explore, teaching, bookings, scan, study, map] : [explore, study, bookings, scan, map]
+    // No Scan tab: check-in is reached from the booking itself, and door posters link straight to /scan.
+    const [explore, map, bookings] = base
+    if (!user?.is_manager) return user?.can_book_recurring ? [explore, teaching, bookings, study, map] : [explore, study, bookings, map]
     base.push({ to: '/approvals', label: 'Approvals', icon: Stamp })
     base.push({ to: '/admin', label: 'Control room', icon: ChartPieSlice })
     base.push(teaching)
@@ -259,11 +258,12 @@ export default function AppShell() {
     <>
       <Backdrop />
       <Sparks />
-      <header className="topbar glass">
+      {/* More than five tabs (HOD and above) don't fit with every label, so the bar compacts sooner. */}
+      <header className={`topbar glass ${links.length > 5 ? 'crowded' : ''}`}>
         <Wordmark />
         <nav className="nav-links" aria-label="Main">
           {links.map((l) => (
-            <NavLink key={l.to} to={l.to} className={`nav-link ${isActive(l.to) ? 'on' : ''}`}>
+            <NavLink key={l.to} to={l.to} title={l.label} className={`nav-link ${isActive(l.to) ? 'on' : ''}`}>
               {isActive(l.to) && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
               <l.icon size={16} weight={isActive(l.to) ? 'fill' : 'regular'} />
               <span>{l.label}</span>
@@ -322,7 +322,7 @@ export default function AppShell() {
           <CampusCopilot />
           <CommandPalette open={palette} onOpenChange={setPalette} links={links} />
           <nav className="tabbar glass" aria-label="Main (mobile)">
-            {[...links.slice(0, 4), user.is_manager ? links[5] : { to: '/me', label: 'Profile', icon: UserCircle }].map((l) => (
+            {[...links.slice(0, 4), user.is_manager ? links.find((l) => l.to === '/admin')! : { to: '/me', label: 'Profile', icon: UserCircle }].map((l) => (
               <NavLink key={l.to} to={l.to} className={`tab ${isActive(l.to) ? 'on' : ''}`}>
                 <l.icon size={21} weight={isActive(l.to) ? 'fill' : 'regular'} />
                 <span>{l.label === 'Control room' ? 'Admin' : l.label}</span>

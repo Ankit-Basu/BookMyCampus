@@ -16,7 +16,7 @@ type QueueItem = Booking & {
   requester_role: string
 }
 
-function ApprovalCard({ item }: { item: QueueItem }) {
+function ApprovalCard({ item, picked, onPick }: { item: QueueItem; picked: boolean; onPick: (on: boolean) => void }) {
   const qc = useQueryClient()
   const [comment, setComment] = useState('')
   const [stamp, setStamp] = useState<'approved' | 'rejected' | null>(null)
@@ -46,7 +46,10 @@ function ApprovalCard({ item }: { item: QueueItem }) {
       <div className="pad" style={{ flex: 1, minWidth: 0 }}>
         <div className="spread" style={{ alignItems: 'flex-start' }}>
           <div style={{ minWidth: 0 }}>
-            <div className="eyebrow">{item.resource_type} · {item.reference}</div>
+            <label className="row approval-pick" style={{ gap: 8 }}>
+              <input type="checkbox" checked={picked} onChange={(e) => onPick(e.target.checked)} aria-label={`Select ${item.reference}`} />
+              <span className="eyebrow">{item.resource_type} · {item.reference}</span>
+            </label>
             <Link to={`/resources/${item.resource}`} className="h2" style={{ display: 'block', marginTop: 4 }}>{item.resource_name}</Link>
           </div>
           <span className="tag" style={{ '--c': 'var(--brand)' } as CSSProperties}>
@@ -84,23 +87,70 @@ function ApprovalCard({ item }: { item: QueueItem }) {
   )
 }
 
+/** Approve or reject several requests in one go, one request after another so each is checked on its own. */
+function BulkBar({ items, onDone }: { items: QueueItem[]; onDone: () => void }) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const run = async (approve: boolean) => {
+    setBusy(true)
+    let ok = 0
+    const failed: string[] = []
+    for (const item of items) {
+      try {
+        await api.post(`/bookings/${item.id}/${approve ? 'approve' : 'reject'}`, { comment: '' })
+        ok++
+      } catch (e) {
+        failed.push(`${item.reference}: ${errorMessage(e)}`)
+      }
+    }
+    setBusy(false)
+    if (ok) toast.success(`${approve ? 'Approved' : 'Rejected'} ${ok} request${ok > 1 ? 's' : ''}`)
+    if (failed.length) toast.error(`${failed.length} couldn't be ${approve ? 'approved' : 'rejected'}`, { description: failed.join(' · ') })
+    onDone()
+    qc.invalidateQueries({ queryKey: ['approval-queue'] })
+  }
+  return (
+    <div className="glass bulk-bar">
+      <strong>{items.length} selected</strong>
+      <span className="grow" />
+      <button className="key key-mint key-sm" disabled={busy} onClick={() => run(true)}><Check weight="bold" /> Approve selected</button>
+      <button className="key key-coral key-sm" disabled={busy} onClick={() => run(false)}><X weight="bold" /> Reject selected</button>
+      <button className="key key-ghost key-sm" disabled={busy} onClick={onDone}>Clear</button>
+    </div>
+  )
+}
+
 export default function Approvals() {
   const { data, isLoading } = useQuery({ queryKey: ['approval-queue'], queryFn: () => api.get<QueueItem[]>('/approvals/queue').then((r) => r.data) })
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+  const chosen = data?.filter((i) => picked.has(i.id)) ?? []
+  const pick = (id: number, on: boolean) => setPicked((p) => { const n = new Set(p); if (on) n.add(id); else n.delete(id); return n })
+  const allPicked = !!data?.length && chosen.length === data.length
   return (
     <div className="page">
       <PageHeader
         eyebrow="HOD desk"
         title={<>Approval <em>queue</em></>}
         sub="Requests waiting on you. The slot is already held for the requester — approving confirms it, rejecting hands it back to everyone."
-        actions={<span className="mono muted">{data?.length ?? 0} waiting</span>}
+        actions={
+          <span className="row" style={{ gap: 12 }}>
+            {!!data?.length && (
+              <button className="key key-ghost key-sm" onClick={() => setPicked(allPicked ? new Set() : new Set(data.map((i) => i.id)))}>
+                {allPicked ? 'Select none' : 'Select all'}
+              </button>
+            )}
+            <span className="mono muted">{data?.length ?? 0} waiting</span>
+          </span>
+        }
       />
+      {chosen.length > 0 && <BulkBar items={chosen} onDone={() => setPicked(new Set())} />}
       {isLoading ? (
         <div className="col">{[1, 2, 3].map((i) => <Skeleton key={i} h={180} />)}</div>
       ) : data?.length ? (
         <div className="col" style={{ gap: 16 }}>
           <AnimatePresence mode="popLayout">
             {data.map((item) => (
-              <ApprovalCard key={item.current_step.id} item={item} />
+              <ApprovalCard key={item.current_step.id} item={item} picked={picked.has(item.id)} onPick={(on) => pick(item.id, on)} />
             ))}
           </AnimatePresence>
         </div>

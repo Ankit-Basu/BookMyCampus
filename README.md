@@ -18,36 +18,39 @@ The demo has 32 resources across 7 types: classrooms, laboratories, equipment, s
 
 ## Features
 
-**Students and faculty**
+**Everyone**
 
 - Search and filter resources by type, block and capacity, or show only what is free this hour
 - Room calendar that already shows classes from the timetable, maintenance and other bookings
-- Students book meeting rooms, sports facilities and equipment for themselves
-- Labs (for practicals), classrooms (for classes and make-up classes), seminar halls and vehicles are booked by faculty and staff. Students can see when they are free but cannot book them
-- Faculty can also book for a whole class
 - QR pass for each booking. Any phone camera can scan it to see whether the booking is valid right now, and staff can check the booker in from there
-- Check-in by scanning the poster on the room door
-- Waitlist for a taken slot, with a notification if it opens up
-- **Study spots:** empty classrooms and labs right now (or later today or tomorrow), and how long each stays free, for sitting in between classes
-- **Ask a teacher:** on a lab or classroom, a student sends a request to a teacher, who gets a link with the slot already filled in
-- **Share pass:** send a booking pass to the people you booked with, so any of them can show it at the door
-- Similar rooms that are free at the same time as a taken slot
+- Check-in by scanning the QR poster on the room door, opened from the booking during the check-in window
+- Waitlist for a taken slot, with a notification if it opens up, plus similar rooms free at the same time
 - Hourly chart on each room showing when it is usually quiet
-- Saved rooms, a personal calendar and calendar export (`.ics` file or iCal feed)
-- Campus map showing how much of each block is free
-- Faculty can also repeat a booking weekly
+- **Share pass:** send a booking pass to the people you booked with, so any of them can show it at the door
+- **Add to Google Calendar** in one click, or download an `.ics` file for Outlook and Apple Calendar. A personal iCal feed is on the Profile page
+- Saved rooms, campus map showing how much of each block is free, and live notifications
+
+**Students**
+
+- Book meeting rooms and sports facilities instantly, and request equipment (the HOD approves)
+- Labs, classrooms, seminar halls and vehicles are for faculty and staff. Students see when they are free but cannot book them
+- **Study:** empty classrooms and labs now, in an hour, in three hours or tomorrow, and how long each stays free, for sitting in between classes
+- **Ask a teacher:** on a lab or classroom, send a request to a teacher. The room must be free at that time. The student is told when the teacher books it or declines
 
 **Faculty (Teaching tab)**
 
-- My week: their timetabled classes and their own bookings for the next seven days
-- Make-up class finder: pick a section, length and class size, and it suggests times when the section has no class, the teacher is free and a classroom that fits is empty. One click opens the booking form filled in for that class
-- Student requests: requests from students to book a lab or classroom, with Book it (the slot is filled in) and Decline. The student is told either way
+- Book labs (for practicals) and classrooms (for classes and make-up classes), book **For a class**, and repeat a booking weekly
+- **My week:** timetabled classes and their own bookings for the next seven days
+- **Make-up class finder:** pick a section, class size and length (one lecture, two lectures or a practical). It suggests times when the section has no class, the teacher is free and a classroom that fits is empty. One click opens the booking form filled in for that class
+- **Student requests:** Book it (opens the room with the slot filled in) or Decline with a reason
 
 **HOD**
 
-- Approval queue for requests from their department and for rooms their department owns
-- Add and edit rooms, including CSV import
-- Usage analytics: utilisation, idle assets, a weekday-by-hour heatmap, no-shows and demand
+- Everything faculty have, including the Teaching tab
+- **Approvals:** requests from their department and for rooms their department owns. Select several and approve or reject them together
+- **My department** (Control room): faculty workload (classes a week, teaching hours, bookings, make-up classes, no-shows), students who missed check-ins or are paused, and **notices** to everyone, faculty or students in the department
+- Add and edit rooms (including CSV import), set opening hours and blackout dates, schedule maintenance and print check-in posters
+- Usage analytics: utilisation, idle assets, a weekday-by-hour heatmap, no-shows, demand and approval turnaround
 
 **Campus rules and operations**
 
@@ -124,10 +127,11 @@ New students can also register at `/register` with their 8-digit registration nu
 
 To see the main flow:
 
-1. Sign in as Student, open a piece of equipment and click a free slot. Equipment needs HOD approval, so it is sent as a request.
-2. Sign in as HOD, open **Approvals** and approve it.
-3. Sign in as Student again. The booking is now confirmed, with a QR pass.
-4. Sign in as Faculty, open a classroom or lab and book it **For a class**, such as `K22CS-B`. Only faculty and staff can book labs and classrooms.
+1. Sign in as **Student**, open a piece of equipment and click a free slot. Equipment needs HOD approval, so it is sent as a request.
+2. Still as Student, open a lab such as the AI & Deep Learning Lab. It is view only, so click **Ask a teacher to book it** and send the request to Meera Iyer.
+3. Sign in as **HOD**, open **Approvals** and approve the equipment request. Open **Control room → My department** to see faculty workload and send a notice.
+4. Sign in as **Faculty**, open **Teaching**. Click **Book it** on the student's request, and the student is told. Try the **make-up class finder** for a section such as `K22B`.
+5. Sign in as Student again. The equipment booking is confirmed with a QR pass, and the notifications show the teacher's booking and the HOD's notice.
 
 ## Tech stack
 
@@ -201,7 +205,7 @@ cd backend
 python manage.py test
 ```
 
-There are 302 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
+There are 308 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
 
 | Requirement | Where it is checked |
 |---|---|

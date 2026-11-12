@@ -59,3 +59,23 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.get_full_name() or self.username
+
+
+class DepartmentNotice(models.Model):
+    """A message an HOD sends to everyone in their department, e.g. "Lab 501 is closed tomorrow"."""
+
+    class Audience(models.TextChoices):
+        EVERYONE = "everyone", "Everyone"
+        FACULTY = "faculty", "Faculty"
+        STUDENTS = "students", "Students"
+
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="notices")
+    author = models.ForeignKey("accounts.User", null=True, on_delete=models.SET_NULL, related_name="+")
+    audience = models.CharField(max_length=10, choices=Audience.choices, default=Audience.EVERYONE)
+    title = models.CharField(max_length=120)
+    body = models.CharField(max_length=500, blank=True)
+    recipients = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

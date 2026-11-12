@@ -5,6 +5,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from rest_framework.routers import DefaultRouter
 
+from apps.accounts import department
 from apps.accounts import views as accounts
 from apps.analytics import views as analytics
 from apps.approvals import views as approvals
@@ -57,6 +58,8 @@ api = [
     path("teacher-requests/<int:pk>/fulfil", student.fulfil_request),
     path("teaching/week", teaching.teaching_week),
     path("teaching/makeup", teaching.makeup_slots),
+    path("department/overview", department.overview),
+    path("department/notices", department.notices),
     path("health", analytics.health),
     path("public/stats", analytics.public_stats),
     path("system/health", analytics.system_health),

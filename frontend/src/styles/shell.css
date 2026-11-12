@@ -402,6 +402,24 @@
     display: none;
   }
 }
+/* Seven tabs plus search, theme, bell and avatar: drop the theme name and search label always. */
+.topbar.crowded .theme-name,
+.topbar.crowded .search-pill span {
+  display: none;
+}
+.topbar.crowded .nav-link {
+  padding: 0 10px;
+}
+@media (max-width: 1240px) {
+  .topbar.crowded .nav-link span {
+    display: none;
+  }
+  .topbar.crowded .nav-link em {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+  }
+}
 @media (max-width: 1080px) {
   .nav-link span {
     display: none;

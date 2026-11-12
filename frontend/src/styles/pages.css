@@ -1711,3 +1711,41 @@ a.kpi:hover {
 .week-item:hover {
   background: var(--wash-2);
 }
+
+/* ---------------------------------------------------------------- my department (HOD) */
+
+.dept-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 760px) {
+  .dept-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.dept-students {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.bulk-bar {
+  position: sticky;
+  top: 86px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in oklab, var(--brand) 40%, transparent);
+}
+.approval-pick input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}

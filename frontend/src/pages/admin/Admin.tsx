@@ -15,6 +15,7 @@ const Config = lazy(() => import('./Config'))
 const Operations = lazy(() => import('./Operations'))
 const People = lazy(() => import('./People'))
 const MasterData = lazy(() => import('./MasterData'))
+const Department = lazy(() => import('./Department'))
 
 type Dash = {
   resources: number
@@ -68,46 +69,6 @@ function LiveBoard() {
   )
 }
 
-type Health = {
-  database: boolean
-  redis: boolean
-  sweeper: { last_run: string | null; age_seconds: number | null; healthy: boolean }
-  email: { backend: string; live: boolean }
-  realtime: string
-  timetable: { label: string; published_at: string } | null
-}
-
-/** What's actually running behind the UI — the "is automation alive?" question, answered. */
-function SystemHealth() {
-  const { data } = useQuery({ queryKey: ['health'], queryFn: () => api.get<Health>('/system/health').then((r) => r.data), refetchInterval: 20000 })
-  if (!data) return null
-  const age = data.sweeper.age_seconds
-  const items: { label: string; value: string; ok: boolean; warn?: boolean }[] = [
-    { label: 'Database', value: data.database ? 'PostgreSQL · connected' : 'unreachable', ok: data.database },
-    {
-      label: 'Auto-release sweeper',
-      value: age == null ? 'never ran' : age < 90 ? `ran ${Math.round(age)}s ago` : `ran ${Math.round(age / 60)} min ago`,
-      ok: data.sweeper.healthy,
-    },
-    { label: 'Live notifications', value: 'Server-Sent Events', ok: true },
-    { label: 'Email', value: data.email.live ? 'SMTP · live delivery' : `${data.email.backend} (dev)`, ok: data.email.live, warn: !data.email.live },
-    { label: 'Redis / Celery', value: data.redis ? 'broker reachable' : 'not running (sweeper runs in-process)', ok: data.redis, warn: !data.redis },
-  ]
-  return (
-    <div className="health-strip">
-      {items.map((i) => (
-        <div key={i.label} className="health-item">
-          <span className={`led ${i.ok ? 'pulse' : ''}`} style={{ '--c': i.ok ? 'var(--ok)' : i.warn ? 'var(--brand)' : 'var(--bad)' } as CSSProperties} />
-          <span>
-            <span className="eyebrow" style={{ display: 'block' }}>{i.label}</span>
-            <span style={{ fontSize: 13 }}>{i.value}</span>
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function Overview() {
   const { data } = useQuery({ queryKey: ['dash'], queryFn: () => api.get<Dash>('/analytics/dashboard').then((r) => r.data), refetchInterval: 30000 })
   const { data: util } = useQuery({
@@ -129,7 +90,6 @@ function Overview() {
     : []
   return (
     <>
-      <SystemHealth />
       <div className="overview-top">
         <Reveal className="glass pad dial-card">
           {util ? <Dial value={util.totals.utilisation} label="30-day utilisation" size={220} /> : <Skeleton h={220} style={{ width: 220, borderRadius: '50%' }} />}
@@ -175,6 +135,7 @@ export default function Admin() {
   const { user } = useAuth()
   const tabs = [
     { to: '/admin', label: 'Overview', end: true },
+    ...(user?.department ? [{ to: '/admin/department', label: 'My department' }] : []),
     { to: '/admin/analytics', label: 'Analytics' },
     { to: '/admin/catalogue', label: 'Catalogue' },
     { to: '/admin/config', label: isPolicyAdmin(user) ? 'Rules & workflows' : 'Rules' },
@@ -199,6 +160,7 @@ export default function Admin() {
       <Routes>
         <Route index element={<Overview />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="department" element={<Department />} />
         <Route path="catalogue" element={<Catalogue />} />
         <Route path="config/*" element={<Config />} />
         <Route path="operations/*" element={<Operations />} />
