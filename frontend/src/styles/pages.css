@@ -639,8 +639,12 @@
   overflow: hidden;
   background: var(--well);
 }
-.fc .fc-day-past {
-  background-image: repeating-linear-gradient(-45deg, var(--wash) 0 6px, transparent 6px 12px);
+/* Past days are plain and faded, so they can't be mistaken for the striped classes. */
+.fc .fc-timegrid-col.fc-day-past {
+  background: color-mix(in oklab, var(--background) 45%, transparent);
+}
+.fc .fc-day-past .fc-timegrid-event-harness {
+  opacity: 0.45;
 }
 .fc .fc-timegrid-event {
   border-radius: 8px;

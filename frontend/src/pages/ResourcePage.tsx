@@ -2,7 +2,7 @@ import type { DateSelectArg, EventInput } from '@fullcalendar/core'
 import interactionPlugin from '@fullcalendar/interaction'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { ArrowLeft, ArrowRight, BellRinging, CalendarPlus, Clock, GraduationCap, MapPin, Printer, Repeat, SealCheck, Stamp, User, UsersThree, Warning, Wrench } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, BellRinging, CalendarPlus, Clock, GraduationCap, LockSimple, MapPin, Printer, Repeat, SealCheck, Stamp, User, UsersThree, Warning, Wrench } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -282,7 +282,7 @@ function TakenDrawer({ taken, resource, onClose }: { taken: Taken | null; resour
           <div className="mono" style={{ fontSize: 18, color: 'var(--brand-ink)', whiteSpace: 'nowrap' }}>{format(taken.start, 'HH:mm')}–{format(taken.end, 'HH:mm')}</div>
         </div>
         {!future && <p className="muted" style={{ margin: 0 }}>This time has already passed.</p>}
-        {future && taken.kind === 'booking' && (
+        {future && taken.kind === 'booking' && resource.can_book !== false && (
           <button className="key key-amber" disabled={watch.isPending || watch.isSuccess} onClick={() => watch.mutate()}>
             <BellRinging weight="bold" /> {watch.isSuccess ? 'On the waitlist' : 'Tell me if it frees up'}
           </button>
@@ -453,6 +453,9 @@ export default function ResourcePage() {
   if (!r) return <div className="page"><Skeleton h={420} /></div>
   const gallery = r.images.length ? r.images.map((i) => i.src) : [r.cover]
   const isCustodian = user?.custodian_of.includes(r.id) || user?.role === 'facility_manager' || user?.role === 'admin'
+  // Labs and seminar halls are for staff. Students can still see when they are free, but not book them.
+  const canBook = r.can_book !== false
+  const staffOnly = `${r.type_name === 'Laboratory' ? 'Labs' : r.type_name + 's'} are booked by faculty and staff.`
 
   return (
     <div className="page">
@@ -469,6 +472,8 @@ export default function ResourcePage() {
               <TypeTag name={r.type_name} color={r.type_color} icon={r.type_icon} />
               {r.status === 'down' ? (
                 <span className="tag" style={{ '--c': 'var(--bad)' } as CSSProperties}><Wrench size={12} /> Out of service</span>
+              ) : !canBook ? (
+                <span className="tag" style={{ '--c': 'var(--fg-3)' } as CSSProperties}><LockSimple size={12} /> Faculty and staff only</span>
               ) : r.requires_approval ? (
                 <span className="tag" style={{ '--c': 'var(--brand)' } as CSSProperties}><Stamp size={12} /> Approval required</span>
               ) : (
@@ -540,8 +545,10 @@ export default function ResourcePage() {
         <Reveal className="glass pad cal-card">
           <div className="spread" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
             <div>
-              <div className="h2">Pick a slot</div>
-              <div className="muted" style={{ fontSize: 13 }}>Drag across the free time. Classes, maintenance and other bookings are locked.</div>
+              <div className="h2">{canBook ? 'Pick a slot' : 'When it is free'}</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {canBook ? 'Drag across the free time. Classes, maintenance and other bookings are locked.' : `View only. ${staffOnly} Ask your teacher if you need it.`}
+              </div>
             </div>
             <div className="legend">
               <span><i className="lg-free" /> Free</span>
@@ -561,7 +568,7 @@ export default function ResourcePage() {
               firstDay={1}
               allDaySlot={false}
               nowIndicator
-              selectable={r.status === 'active'}
+              selectable={r.status === 'active' && canBook}
               selectMirror
               unselectAuto
               selectOverlap={false}
@@ -585,7 +592,8 @@ export default function ResourcePage() {
                 const day = (info.date.getDay() + 6) % 7
                 const time = format(info.date, 'HH:mm')
                 const open = av?.rules.some((r) => r.weekdays.includes(day) && r.open.slice(0, 5) <= time && time < r.close.slice(0, 5))
-                if (!open) toast.info('Closed at that time', { description: 'Pick a time inside the white opening hours.' })
+                if (!canBook) toast.info('View only', { description: `${staffOnly} Ask your teacher if you need it.` })
+                else if (!open) toast.info('Closed at that time', { description: 'Pick a time inside the white opening hours.' })
               }}
               datesSet={(d) => setRange({ from: format(d.start, 'yyyy-MM-dd'), to: format(d.end, 'yyyy-MM-dd') })}
               eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}

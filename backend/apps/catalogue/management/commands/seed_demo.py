@@ -172,11 +172,13 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ catalogue
     def catalogue(self):
         T = {}
+        # Labs and seminar halls are booked by teaching and support staff, never by students.
+        STAFF_ROLES = [Role.FACULTY, Role.STAFF, Role.CUSTODIAN, Role.DEPT_HEAD, Role.FACILITY_MANAGER, Role.ADMIN]
         types = [
             ("Classroom", "chalkboard", "#F5B544", "Lecture rooms with projection — faculty book freely, students need HOD approval.", [], False),
-            ("Laboratory", "flask", "#3EE6C1", "Teaching and research labs.", [], True),
+            ("Laboratory", "flask", "#3EE6C1", "Teaching and research labs. Faculty and staff book these.", STAFF_ROLES, True),
             ("Equipment", "microscope", "#8B7CFF", "High-value instruments and lendable kit. HOD approval required.", [], True),
-            ("Seminar Hall", "presentation", "#FF7A59", "Halls and auditoria for events, talks and defences.", [Role.FACULTY, Role.STAFF, Role.CUSTODIAN, Role.DEPT_HEAD, Role.FACILITY_MANAGER, Role.ADMIN], True),
+            ("Seminar Hall", "presentation", "#FF7A59", "Halls and auditoria for events, talks and defences.", STAFF_ROLES, True),
             ("Sports Facility", "basketball", "#5FD068", "Courts, turf and fitness spaces.", [], True),
             ("Meeting Room", "users-three", "#5AB2FF", "Bookable rooms for group work and meetings.", [], True),
             ("Vehicle", "van", "#E66BD3", "Campus transport for field trips and official travel.", [Role.FACULTY, Role.STAFF, Role.DEPT_HEAD, Role.FACILITY_MANAGER, Role.ADMIN], False),
@@ -312,7 +314,6 @@ class Command(BaseCommand):
         wf("Students in classrooms", "Classroom", [Role.STUDENT], [("HOD approval", Role.DEPT_HEAD)])
         wf("Seminar hall events", "Seminar Hall", [], [("HOD approval", Role.DEPT_HEAD)])
         wf("Vehicle requisition", "Vehicle", [], [("HOD approval", Role.DEPT_HEAD)])
-        wf("Student lab access", "Laboratory", [Role.STUDENT], [("HOD approval", Role.DEPT_HEAD)])
 
     # ------------------------------------------------------------------ consumables
     def consumables(self):

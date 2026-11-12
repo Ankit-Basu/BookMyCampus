@@ -133,7 +133,9 @@ def validate_request(user, resource, start, end, attendees=1, now=None, check_qu
     if allowed and user.role not in allowed and not user.is_superuser:
         raise RuleViolation(
             "role_not_permitted",
-            f"{resource.type.name} can only be booked by: {', '.join(Role(r).label for r in allowed if r in Role.values)}.",
+            f"{resource.type.name} is booked by faculty and staff only. Ask your teacher if you need it."
+            if user.role == Role.STUDENT
+            else f"{resource.type.name} can only be booked by: {', '.join(Role(r).label for r in allowed if r in Role.values)}.",
             http_status=403,
         )
     if attendees > resource.capacity:

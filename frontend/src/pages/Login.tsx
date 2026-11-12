@@ -13,7 +13,7 @@ import { ROLE_LABEL } from '../lib/format'
 type Demo = { username: string; name: string; role: string; role_label: string; password: string }
 
 const ROLE_BLURB: Record<string, string> = {
-  student: 'Book for yourself or your class, scan in',
+  student: 'Book classrooms, courts and kit, scan in',
   faculty: 'Book labs and rooms, repeat weekly for a class',
   dept_head: 'Approve requests, add rooms, see usage',
 }
@@ -54,7 +54,7 @@ export default function Login() {
     <AuthLayout
       eyebrow="Sign in"
       title={<>Your campus,<br /><em>on reservation.</em></>}
-      blurb="Sign in with your registration number. Trying it out? The demo personas sign you in instantly: request a lab as the student, then approve it as the HOD."
+      blurb="Sign in with your registration number. Trying it out? The demo personas sign you in instantly: request a classroom as the student, then approve it as the HOD."
       aside={
         <ul className="auth-list">
           <li><CalendarCheck size={20} weight="duotone" /><span><strong>See what’s free right now</strong>Live availability that already knows the timetable.</span></li>

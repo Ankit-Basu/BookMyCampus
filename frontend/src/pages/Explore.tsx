@@ -1,4 +1,4 @@
-import { ArrowRight, BookmarkSimple, Buildings, Lightning, MagnifyingGlass, SealCheck, Stamp, UsersThree } from '@phosphor-icons/react'
+import { ArrowRight, BookmarkSimple, Buildings, Lightning, LockSimple, MagnifyingGlass, SealCheck, Stamp, UsersThree } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { addHours, startOfHour, format, isToday, isTomorrow } from 'date-fns'
 import { memo, useDeferredValue, useMemo, type CSSProperties } from 'react'
@@ -73,7 +73,9 @@ export const ResourceCard = memo(function ResourceCard({ r, index = 0 }: { r: Re
                 </div>
                 <div className="rcard-tags">
                   <span className="tag"><UsersThree size={12} /> {r.capacity}</span>
-                  {r.requires_approval ? (
+                  {r.can_book === false ? (
+                    <span className="tag" style={{ '--c': 'var(--fg-3)' } as CSSProperties}><LockSimple size={12} /> Staff only</span>
+                  ) : r.requires_approval ? (
                     <span className="tag" style={{ '--c': 'var(--brand)' } as CSSProperties}><Stamp size={12} /> Approval</span>
                   ) : (
                     <span className="tag" style={{ '--c': 'var(--ok)' } as CSSProperties}><SealCheck size={12} /> Instant</span>

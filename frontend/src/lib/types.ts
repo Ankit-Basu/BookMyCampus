@@ -44,6 +44,8 @@ export type Resource = {
   value_inr: number
   status: 'active' | 'down' | 'retired'
   requires_approval: boolean
+  /** False when the signed-in user's role may not book this type, e.g. a student on a lab. */
+  can_book: boolean
 }
 
 export type ResourceDetail = Resource & {

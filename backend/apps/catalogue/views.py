@@ -171,6 +171,9 @@ class ResourceViewSet(viewsets.ModelViewSet):
         start, end = self._requested_slot(request.data)
         if start <= timezone.now():
             raise BookingError("slot_passed", "That time has already passed.")
+        allowed = resource.type.allowed_roles
+        if allowed and request.user.role not in allowed and not request.user.is_superuser:
+            raise BookingError("role_not_permitted", f"{resource.type.name} is booked by staff only, so there is no waitlist for you to join.", http_status=403)
         held = BookingSlot.objects.filter(
             resource=resource, kind=BookingSlot.Kind.BOOKING, period__overlap=(start, end)
         ).exclude(booking__user=request.user)

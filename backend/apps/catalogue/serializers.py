@@ -47,14 +47,24 @@ class ResourceListSerializer(serializers.ModelSerializer):
     cover = serializers.CharField(read_only=True)
     requires_approval = serializers.SerializerMethodField()
     is_saved = serializers.SerializerMethodField()
+    can_book = serializers.SerializerMethodField()
 
     class Meta:
         model = Resource
         fields = [
             "id", "code", "name", "description", "type", "type_name", "type_slug", "type_color", "type_icon",
             "department", "department_code", "location", "location_label", "building", "capacity", "features",
-            "cover", "value_inr", "status", "requires_approval", "is_saved",
+            "cover", "value_inr", "status", "requires_approval", "is_saved", "can_book",
         ]
+
+    def get_can_book(self, obj):
+        """Whether the signed-in user's role may book this type at all, so the page can show it as view-only."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        allowed = obj.type.allowed_roles
+        return not allowed or user.role in allowed or user.is_superuser
 
     def get_is_saved(self, obj):
         return obj.id in self.context.get("saved_ids", ())

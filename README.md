@@ -22,14 +22,16 @@ The demo has 32 resources across 7 types: classrooms, laboratories, equipment, s
 
 - Search and filter resources by type, block and capacity, or show only what is free this hour
 - Room calendar that already shows classes from the timetable, maintenance and other bookings
-- Students book for themselves. Faculty can also book for a whole class
+- Students book classrooms, meeting rooms, sports facilities and equipment for themselves
+- Laboratories, seminar halls and vehicles are for faculty and staff. Students can see when they are free but cannot book them
+- Faculty can also book for a whole class
 - QR pass for each booking, with check-in by scanning the poster on the room door
 - Waitlist for a taken slot, with a notification if it opens up
 - Similar rooms that are free at the same time as a taken slot
 - Hourly chart on each room showing when it is usually quiet
 - Saved rooms, a personal calendar and calendar export (`.ics` file or iCal feed)
 - Campus map showing how much of each block is free
-- Faculty can also repeat a booking weekly, and book seminar halls and vehicles
+- Faculty can also repeat a booking weekly
 
 **HOD**
 
@@ -112,10 +114,10 @@ New students can also register at `/register` with their 8-digit registration nu
 
 To see the main flow:
 
-1. Sign in as Student, open a laboratory and click a free slot. A student's lab booking needs HOD approval, so it is sent as a request.
+1. Sign in as Student, open a classroom and click a free slot. A student's classroom booking needs HOD approval, so it is sent as a request.
 2. Sign in as HOD, open **Approvals** and approve it.
 3. Sign in as Student again. The booking is now confirmed, with a QR pass.
-4. Sign in as Faculty to book a room **For a class**, such as `K22CS-B`. Only teaching staff can book for a class.
+4. Sign in as Faculty, open a laboratory and book it **For a class**, such as `K22CS-B`. Only faculty and staff can book labs or book for a class.
 
 ## Tech stack
 
@@ -189,7 +191,7 @@ cd backend
 python manage.py test
 ```
 
-There are 266 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
+There are 272 backend tests. PostgreSQL has to be running, and a full run takes several minutes.
 
 | Requirement | Where it is checked |
 |---|---|

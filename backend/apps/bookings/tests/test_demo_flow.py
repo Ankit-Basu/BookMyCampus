@@ -1,4 +1,4 @@
-"""The story the demo tells: students and faculty book for themselves or a class, the HOD approves."""
+"""The story the demo tells: students book for themselves, faculty book labs and classes, the HOD approves."""
 import threading
 from io import StringIO
 from unittest.mock import patch
@@ -54,8 +54,8 @@ class ClassBookingTest(APITestCase):
         r = self.book(self.faculty, "K22CS-B")
         self.assertEqual((r.status_code, r.data["status"], r.data["on_behalf_of"]), (201, "confirmed", "K22CS-B"))
 
-    def test_student_lab_request_goes_to_the_hod_who_can_approve_it(self):
-        wf = ApprovalWorkflow.objects.create(name="Student lab access", resource_type=self.rtype, requester_roles=[Role.STUDENT])
+    def test_student_request_goes_to_the_hod_who_can_approve_it(self):
+        wf = ApprovalWorkflow.objects.create(name="Students in classrooms", resource_type=self.rtype, requester_roles=[Role.STUDENT])
         ApprovalStep.objects.create(workflow=wf, order=1, name="HOD approval", approver_role=Role.DEPT_HEAD)
         r = self.book(self.student)
         self.assertEqual(r.data["status"], "pending")
@@ -68,6 +68,20 @@ class ClassBookingTest(APITestCase):
         self.assertEqual([b["id"] for b in self.client.get("/api/approvals/queue").data], [r.data["id"]])
         self.assertEqual(self.client.post(f"/api/bookings/{r.data['id']}/approve", {}, format="json").status_code, 200)
         self.assertEqual(Booking.objects.get(pk=r.data["id"]).status, "confirmed")
+
+    def test_staff_only_labs_refuse_students_and_show_as_view_only(self):
+        self.rtype.allowed_roles = [Role.FACULTY, Role.STAFF, Role.DEPT_HEAD]
+        self.rtype.save()
+        r = self.book(self.student)
+        self.assertEqual((r.status_code, r.data["error"]), (403, "role_not_permitted"))
+        self.assertFalse(self.client.get(f"/api/resources/{self.lab.id}").data["can_book"])
+        self.assertEqual(self.book(self.faculty).status_code, 201)
+        self.assertTrue(self.client.get(f"/api/resources/{self.lab.id}").data["can_book"])
+
+        # Nor can a student queue for a lab slot someone else holds.
+        self.client.force_authenticate(self.student)
+        w = self.client.post(f"/api/resources/{self.lab.id}/watch", {"start": at(2, 10), "end": at(2, 11)}, format="json")
+        self.assertEqual((w.status_code, w.data["error"]), (403, "role_not_permitted"))
 
 
 class HodRoutingTest(APITestCase):
